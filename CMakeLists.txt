@@ -25,7 +25,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM REQUIRED CONFIG HINTS "/usr/local/llvm-14")
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 llvm_map_components_to_libnames(
@@ -38,6 +38,7 @@ INCLUDE_DIRECTORIES(
     include
     include/cminusfc
     include/common
+    include/front
     include/lightir
     include/codegen
     include/passes/

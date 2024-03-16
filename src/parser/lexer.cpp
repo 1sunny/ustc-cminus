@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-#include<syntax_analyzer.h>
+#include<syntax_analyzer.hpp>
 
 ///
 extern int lines;
@@ -32,7 +32,7 @@ int main(int argc, const char **argv) {
 
      int token;
      printf("%5s\t%10s\t%s\t%s\n", "Token", "Text", "Line", "Column (Start,End)");
-     while ((token = yylex())) {
+     while ((token = yylex()) != END) {
           printf("%-5d\t%10s\t%d\t(%d,%d)\n",
                  token, yytext,
                  lines, pos_start, pos_end);
