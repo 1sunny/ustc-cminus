@@ -25,7 +25,7 @@ std::string Instruction::get_instr_op_name() const {
 }
 
 IBinaryInst::IBinaryInst(OpID id, Value *v1, Value *v2, BasicBlock *bb)
-    : BaseInst<IBinaryInst>(bb->get_module()->get_int32_type(), id, bb) {
+    : BaseInst<IBinaryInst>(bb->get_module()->get_int32_type(), id, bb) { // BaseInst会构造Instruction,将this加入bb
     assert(v1->get_type()->is_int32_type() && v2->get_type()->is_int32_type() &&
            "IBinaryInst operands are not both i32");
     add_operand(v1);
@@ -206,6 +206,7 @@ ReturnInst::ReturnInst(Value *val, BasicBlock *bb)
 }
 
 ReturnInst *ReturnInst::create_ret(Value *val, BasicBlock *bb) {
+    // 调用上面的构造函数创建
     return create(val, bb);
 }
 ReturnInst *ReturnInst::create_void_ret(BasicBlock *bb) {

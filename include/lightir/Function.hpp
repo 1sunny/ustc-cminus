@@ -23,6 +23,7 @@ class Function : public Value, public llvm::ilist_node<Function> {
     Function(const Function &) = delete;
     Function(FunctionType *ty, const std::string &name, Module *parent);
     ~Function() = default;
+    // 创建并返回函数，参数依次是待创建函数类型 ty，函数名字 name (不可为空)，函数所属的模块 parent
     static Function *create(FunctionType *ty, const std::string &name,
                             Module *parent);
 

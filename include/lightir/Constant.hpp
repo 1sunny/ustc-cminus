@@ -19,6 +19,7 @@ class ConstantInt : public Constant {
 
   public:
     int get_value() { return value_; }
+    // 以值 val 来创建常量
     static ConstantInt *get(int val, Module *m);
     static ConstantInt *get(bool val, Module *m);
     virtual std::string print() override;

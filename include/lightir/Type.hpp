@@ -25,6 +25,7 @@ class Type {
     explicit Type(TypeID tid, Module *m);
     ~Type() = default;
 
+    // 子类的构造函数会调用Type构造函数设置tid_
     TypeID get_type_id() const { return tid_; }
 
     bool is_void_type() const { return get_type_id() == VoidTyID; }
@@ -38,7 +39,9 @@ class Type {
     bool is_int1_type() const;
 
     // Return related data member if is the required type, else throw error
+    // 若是 PointerType 则返回指向的类型，若不是则返回 nullptr
     Type *get_pointer_element_type() const;
+    // 若是 ArrayType 则返回数组元素的类型，若不是则返回 nullptr
     Type *get_array_element_type() const;
 
     Module *get_module() const { return m_; }
@@ -65,16 +68,24 @@ class FunctionType : public Type {
   public:
     FunctionType(Type *result, std::vector<Type *> params);
 
+    // 判断返回值类型是否合法
     static bool is_valid_return_type(Type *ty);
+    // 判断参数类型是否合法
     static bool is_valid_argument_type(Type *ty);
 
+    // 根据返回值类型 result，参数类型列表 params 创建函数类型
     static FunctionType *get(Type *result, std::vector<Type *> params);
 
+    // 返回该函数类型的参数个数
     unsigned get_num_of_args() const;
 
+    // 获得该函数类型第 i 个参数的类型
     Type *get_param_type(unsigned i) const;
+    // 获得该函数类型的参数类型链表的起始迭代器
     std::vector<Type *>::iterator param_begin() { return args_.begin(); }
+    // 获得该函数类型的参数类型链表的结束迭代器
     std::vector<Type *>::iterator param_end() { return args_.end(); }
+    // 获得该函数类型的返回值类型
     Type *get_return_type() const;
 
   private:
@@ -86,11 +97,15 @@ class ArrayType : public Type {
   public:
     ArrayType(Type *contained, unsigned num_elements);
 
+    // 判断数组元素类型是否合法
     static bool is_valid_element_type(Type *ty);
 
+    // 通过数组元素类型 contained 以及数组长度 num_elements 创建数组类型
     static ArrayType *get(Type *contained, unsigned num_elements);
 
+    // 得到该数组类型的元素类型
     Type *get_element_type() const { return contained_; }
+    // 获得该数组类型的长度
     unsigned get_num_of_elements() const { return num_elements_; }
 
   private:
@@ -101,8 +116,10 @@ class ArrayType : public Type {
 class PointerType : public Type {
   public:
     PointerType(Type *contained);
+    // 获取该指针类型指向的元素类型
     Type *get_element_type() const { return contained_; }
 
+    // 创建指向类型为 contained 的指针类型
     static PointerType *get(Type *contained);
 
   private:

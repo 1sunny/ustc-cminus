@@ -13,9 +13,12 @@ class User : public Value {
     unsigned get_num_operand() const { return operands_.size(); }
 
     // start from 0
+    // 从该使用者的操作数链表中取出第 i 个操作数
     Value *get_operand(unsigned i) const { return operands_.at(i); };
     // start from 0
+    // 将该使用者的第 i 个操作数设为值 v
     void set_operand(unsigned i, Value *v);
+    // 将值 v 添加到该使用者的操作数链表上
     void add_operand(Value *v);
 
     void remove_all_operands();

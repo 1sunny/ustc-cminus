@@ -68,6 +68,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
     Module *get_module();
 
     OpID get_instr_type() const { return op_id_; }
+    // 获取指令类型的名字
     std::string get_instr_op_name() const;
 
     bool is_void() {
@@ -114,8 +115,10 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
     BasicBlock *parent_;
 };
 
+// 注意这个类模板
 template <typename Inst> class BaseInst : public Instruction {
   protected:
+    // create被子类继承, 子类调用 create就是调用这里
     template <typename... Args> static Inst *create(Args &&...args) {
         return new Inst(std::forward<Args>(args)...);
     }

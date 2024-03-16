@@ -18,6 +18,7 @@ class IRBuilder {
     void set_insert_point(BasicBlock *bb) {
         this->BB_ = bb;
     } // 在某个基本块中插入指令
+    // 创建的指令并对应插入到基本块中，函数名字和参数名字和 IR 文档是一一对应的
     IBinaryInst *create_iadd(Value *lhs, Value *rhs) {
         return IBinaryInst::create_add(lhs, rhs, this->BB_);
     } // 创建加法指令（以及其他算术指令）

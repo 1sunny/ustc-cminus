@@ -16,6 +16,7 @@ class Module;
 class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
   public:
     ~BasicBlock() = default;
+    // 创建并返回基本块，参数分别是基本块所属的模块，基本块名字（默认为空），基本块所属的函数
     static BasicBlock *create(Module *m, const std::string &name,
                               Function *parent) {
         auto prefix = name.empty() ? "" : "label_";
@@ -34,11 +35,15 @@ class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
     // If the Block is terminated by ret/br
     bool is_terminated() const;
     // Get terminator, only accept valid case use
+    // 返回该基本块的终止指令，若基本块的最后一条指令不是终止指令返回则返回 nullptr
     Instruction *get_terminator();
 
     /****************api about Instruction****************/
+    // 将指令 instr 添加到该基本块的指令链表末端，使用 IRBuilder 来创建函数时会自动调用此方法
     void add_instruction(Instruction *instr);
+    // 将指令 instr 添加到该基本块的指令链表首部
     void add_instr_begin(Instruction *instr) { instr_list_.push_front(instr); }
+    // 将指令 instr 从该基本块的指令链表中移除，该 API 会同时维护好 instr 的操作数的 use 链表。
     void erase_instr(Instruction *instr) { instr_list_.erase(instr); }
 
     llvm::ilist<Instruction> &get_instructions() { return instr_list_; }
