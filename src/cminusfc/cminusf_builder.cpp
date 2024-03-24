@@ -473,11 +473,9 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
   // 用一个flag来表示scope里面存的到底是地址的地址还是地址
   Value *result = pValue;
   if (type == Scope::VarType::ParamArray) {
-    context.from_param_array = true;
     result = builder->create_load(pValue);
   }
   if (lval.ArrayExpList.empty()) { // 这个也可能是传的数组名
-    return result;
   } else {
     // param array 和 local定义的array访问区别:
     // define dso_local i32 @test4([6 x i32]* %0) #0 {
@@ -522,8 +520,9 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
       }
       // LOG_DEBUG << pValue->get_type()->print();
     }
-    return result;
   }
+  context.from_param_array = (type == Scope::VarType::ParamArray);
+  return result;
 }
 
 Value* CminusfBuilder::visit(AstAssignStmt &node) {
@@ -679,7 +678,6 @@ Value* CminusfBuilder::visit(AstCallee &node) {
     if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
       context.load_lval.pop_back();
     }
-    context.from_param_array = false;
     actual_params.push_back(pValue);
     iterator++;
   }
