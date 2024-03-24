@@ -17,7 +17,7 @@ Type *FLOATPTR_T;
 
 int num_semantic_error;
 
-std::ostream& semantic_stream = std::cout;
+std::ostream& semantic_stream = std::cerr;
 
 std::ostream& semantic_error() {
   num_semantic_error++;

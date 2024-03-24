@@ -33,4 +33,5 @@ void driver::scan_end() {
 // .y发现错误后调用
 void driver::error(const yy::location &l, const std::string &m) {
   std::cerr << l << ": " << m << std::endl;
+  exit(1);
 }
