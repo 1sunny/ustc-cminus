@@ -110,9 +110,9 @@ void Config::check() {
     if (input_file.empty()) {
         print_err("no input file");
     }
-    if (input_file.extension() != ".cminus") {
-        print_err("file format not recognized");
-    }
+    // if (input_file.extension() != ".cminus") {
+    //     print_err("file format not recognized");
+    // }
     if (emitllvm and emitasm) {
         print_err("emit llvm and emit asm both set");
     }
