@@ -537,11 +537,18 @@ Value* CminusfBuilder::visit(AstAssignStmt &node) {
   return builder->create_store(pValue, loc);
 }
 
+// TODO 可以返回右值引用吗?
+std::string next_bb_num_string() {
+  static int bb_num = 0;
+  return "_" + std::to_string(bb_num++);
+}
+
 Value* CminusfBuilder::visit(AstSelectStmt &node) {
   // module.get是不是不太好啊, 按理说create应该声明const ?
-  auto trueBB = BasicBlock::create(module.get(), "trueBB", context.func);
-  auto falseBB = BasicBlock::create(module.get(), "falseBB", context.func);
-  auto exitBB = BasicBlock::create(module.get(), "exitBB", context.func);
+  std::string no = next_bb_num_string();
+  auto trueBB = BasicBlock::create(module.get(), "trueBB" + no, context.func);
+  auto falseBB = BasicBlock::create(module.get(), "falseBB" + no, context.func);
+  auto exitBB = BasicBlock::create(module.get(), "exitBB" + no, context.func);
   context.CondBBStack.push_back({trueBB, node.elseStmt == nullptr ? exitBB : falseBB});
 
   Value *last_value = node.Cond->accept(*this);
@@ -573,9 +580,10 @@ Value* CminusfBuilder::visit(AstSelectStmt &node) {
 }
 
 Value* CminusfBuilder::visit(AstIterationStmt &node) {
-  auto condBB = BasicBlock::create(module.get(), "condBB", context.func);
-  auto loopBB = BasicBlock::create(module.get(), "loopBB", context.func);
-  auto exitBB = BasicBlock::create(module.get(), "successorBB", context.func);
+  std::string no = next_bb_num_string();
+  auto condBB = BasicBlock::create(module.get(), "condBB" + no, context.func);
+  auto loopBB = BasicBlock::create(module.get(), "loopBB" + no, context.func);
+  auto exitBB = BasicBlock::create(module.get(), "successorBB" + no, context.func);
 
   context.condBB.push_back(condBB);
   context.successorBB.push_back(exitBB);
@@ -1021,7 +1029,8 @@ Value* CminusfBuilder::visit(AstLAndExp &node) {
   if(node.LAndExp == nullptr) {
     return node.EqExp->accept(*this);
   } else {
-    auto trueBB = BasicBlock::create(module.get(), "trueBB", context.func);
+    std::string no = next_bb_num_string();
+    auto trueBB = BasicBlock::create(module.get(), "trueBB" + no, context.func);
     Value *left_last_value = node.LAndExp->accept(*this);
     Value *cond = gen_cmp(left_last_value);
     builder->create_cond_br(cond, trueBB, context.CondBBStack.back().falseBB);
@@ -1034,7 +1043,8 @@ Value* CminusfBuilder::visit(AstLOrExp &node) {
   if(node.LOrExp == nullptr) {
     return node.LAndExp->accept(*this);
   } else {
-    auto falseBB = BasicBlock::create(module.get(), "falseBB", context.func);
+    std::string no = next_bb_num_string();
+    auto falseBB = BasicBlock::create(module.get(), "falseBB"  + no, context.func);
     context.CondBBStack.push_back({context.CondBBStack.back().trueBB, falseBB});
     Value *left_last_value = node.LOrExp->accept(*this);
     context.CondBBStack.pop_back();
