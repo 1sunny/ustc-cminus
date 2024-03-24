@@ -529,12 +529,23 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
 
 Value* CminusfBuilder::visit(AstAssignStmt &node) {
   MY_ASSERT(node.Exp && node.LVal);
-  Value *pValue = node.Exp->accept(*this);
+  Value *value = node.Exp->accept(*this);
   context.load_lval = false;
   Value *loc = node.LVal->accept(*this);
   context.load_lval = true;
   // TODO 类型转换
-  return builder->create_store(pValue, loc);
+  Type *loc_type = loc->get_type()->get_pointer_element_type();
+  MY_ASSERT(loc->get_type()->is_pointer_type()
+            && loc_type->is_float_type()
+            || loc_type->is_integer_type());
+  if (loc_type == INT32_T) {
+    value = to_int32_type(value);
+  } else if (loc_type == FLOAT_T) {
+    value = to_float_type(value);
+  } else {
+    MY_ASSERT(false);
+  }
+  return builder->create_store(value, loc);
 }
 
 // TODO 可以返回右值引用吗?
