@@ -257,6 +257,12 @@ FuncDef:
         $$->id = $2;
         $$->Block = std::shared_ptr<AstBlock>($5);
     }
+    | BType IDENTIFIER LPARENTHESE VOID RPARENTHESE Block {
+        $$ = new AstFuncDef();
+        $$->type = $1;
+        $$->id = $2;
+        $$->Block = std::shared_ptr<AstBlock>($6);
+    }
     | BType IDENTIFIER LPARENTHESE FuncFParamList RPARENTHESE Block {
         $$ = new AstFuncDef();
         $$->type = $1;
