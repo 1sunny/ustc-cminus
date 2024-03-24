@@ -4,6 +4,7 @@
 #include "IRprinter.hpp"
 #include "Module.hpp"
 #include "Type.hpp"
+#include "logging.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -43,6 +44,12 @@ IBinaryInst *IBinaryInst::create_mul(Value *v1, Value *v2, BasicBlock *bb) {
 }
 IBinaryInst *IBinaryInst::create_sdiv(Value *v1, Value *v2, BasicBlock *bb) {
     return create(sdiv, v1, v2, bb);
+}
+IBinaryInst *IBinaryInst::create_and(Value *v1, Value *v2, BasicBlock *bb) {
+    return create(And, v1, v2, bb);
+}
+IBinaryInst *IBinaryInst::create_or(Value *v1, Value *v2, BasicBlock *bb) {
+    return create(Or, v1, v2, bb);
 }
 
 FBinaryInst::FBinaryInst(OpID id, Value *v1, Value *v2, BasicBlock *bb)

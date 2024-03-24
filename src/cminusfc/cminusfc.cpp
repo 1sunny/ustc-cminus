@@ -4,6 +4,7 @@
 #include "Module.hpp"
 #include "PassManager.hpp"
 #include "cminusf_builder.hpp"
+#include "driver.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -42,9 +43,11 @@ int main(int argc, char **argv) {
     Config config(argc, argv);
 
     std::unique_ptr<Module> m;
+    driver driver;
+    // 为什么要加一个作用域
+    driver.parse(config.input_file);
     {
-        auto syntax_tree = parse(config.input_file.c_str());
-        auto ast = AST(syntax_tree);
+        auto ast = syntax_tree(driver.compUnitResult);
         CminusfBuilder builder;
         ast.run_visitor(builder);
         m = builder.getModule();

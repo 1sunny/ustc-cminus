@@ -87,6 +87,10 @@ std::string print_instr_op_name(Instruction::OpID id) {
         return "fptosi";
     case Instruction::sitofp:
         return "sitofp";
+    case Instruction::And:
+        return "and";
+    case Instruction::Or:
+        return "or";
     }
     assert(false && "Must be bug");
 }

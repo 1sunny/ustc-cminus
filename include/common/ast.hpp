@@ -1,30 +1,39 @@
 #pragma once
 
-extern "C" {
-#include "syntax_tree.h"
-extern syntax_tree *parse(const char *input);
-}
 #include "User.hpp"
+#include "logging.hpp"
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
-enum CminusType { TYPE_INT, TYPE_FLOAT, TYPE_VOID };
+enum BType {
+    TYPE_INT, TYPE_FLOAT, TYPE_VOID
+};
+
+extern const char* BType_string[];
 
 enum RelOp {
     // <=
-    OP_LE,
+    OP_LTE,
     // <
     OP_LT,
     // >
     OP_GT,
     // >=
-    OP_GE,
+    OP_GTE,
+};
+
+extern const char* RelOp_string[];
+
+enum EqOp {
     // ==
     OP_EQ,
     // !=
     OP_NEQ
 };
+
+extern const char* EqOp_string[];
 
 enum AddOp {
     // +
@@ -33,222 +42,542 @@ enum AddOp {
     OP_MINUS
 };
 
+extern const char* AddOp_string[];
+
 enum MulOp {
     // *
     OP_MUL,
     // /
-    OP_DIV
+    OP_DIV,
+    // %
+    OP_MOD
 };
 
-class AST;
+extern const char* MulOp_string[];
 
-struct ASTNode;
-struct ASTProgram;
-struct ASTDeclaration;
-struct ASTNum;
-struct ASTVarDeclaration;
-struct ASTFunDeclaration;
-struct ASTParam;
-struct ASTCompoundStmt;
-struct ASTStatement;
-struct ASTExpressionStmt;
-struct ASTSelectionStmt;
-struct ASTIterationStmt;
-struct ASTReturnStmt;
-struct ASTFactor;
-struct ASTExpression;
-struct ASTVar;
-struct ASTAssignExpression;
-struct ASTSimpleExpression;
-struct ASTAdditiveExpression;
-struct ASTTerm;
-struct ASTCall;
+enum UnaryOp {
+    // +
+    OP_POS,
+    // -
+    OP_NEG,
+    // !
+    OP_NOT
+};
 
-class ASTVisitor;
+extern const char* UnaryOp_string[];
 
-class AST {
-  public:
-    AST() = delete;
-    AST(syntax_tree *);
-    AST(AST &&tree) {
-        root = tree.root;
-        tree.root = nullptr;
+enum LogicOp {
+    // &&
+    OP_AND,
+    // ||
+    OP_OR
+};
+
+extern const char* LogicOp_string[];
+
+struct AstTreeNode;
+struct AstCompUnit;
+struct AstDeclDef;
+struct AstConstDecl;
+struct AstConstDefList;
+struct AstConstDef;
+struct AstArrayConstExpList;
+struct AstConstInitVal;
+struct AstConstInitValList;
+struct AstVarDecl;
+struct AstVarDefList;
+struct AstVarDef;
+struct AstInitVal;
+struct AstInitValList;
+struct AstFuncDef;
+struct AstFuncFParamList;
+struct AstFuncFParam;
+struct AstParamArrayExpList;
+struct AstBlock;
+struct AstBlockItemList;
+struct AstBlockItem;
+struct AstStmt;
+struct AstAssignStmt;
+struct AstSelectStmt;
+struct AstBreakStmt;
+struct AstContinueStmt;
+struct AstIterationStmt;
+struct AstReturnStmt;
+struct AstExp;
+struct AstCond;
+struct AstLVal;
+struct AstArrayExpList;
+struct AstPrimaryExp;
+struct AstInteger;
+struct AstFloat;
+struct AstUnaryExp;
+struct AstCallee;
+struct AstExpList;
+struct AstMulExp;
+struct AstAddExp;
+struct AstRelExp;
+struct AstEqExp;
+struct AstLAndExp;
+struct AstLOrExp;
+struct AstConstExp;
+
+class syntax_tree_visitor;
+
+class syntax_tree {
+public:
+    syntax_tree(std::shared_ptr<AstCompUnit> start_node) {
+      // Parameter 'start_node' is passed by value and only copied once; consider moving it to avoid unnecessary copies
+      // root = start_node;
+      root = std::move(start_node);
     };
-    ASTProgram *get_root() { return root.get(); }
-    void run_visitor(ASTVisitor &visitor);
 
-  private:
-    ASTNode *transform_node_iter(syntax_tree_node *);
-    std::shared_ptr<ASTProgram> root = nullptr;
+    syntax_tree(syntax_tree &&tree) {
+      root = tree.root;
+      tree.root = nullptr;
+    };
+
+    AstCompUnit *get_root() { return root.get(); }
+
+    void run_visitor(syntax_tree_visitor &visitor);
+
+private:
+    std::shared_ptr<AstCompUnit> root = nullptr;
 };
 
-struct ASTNode {
-    virtual Value *accept(ASTVisitor &) = 0;
-    virtual ~ASTNode() = default;
+struct AstTreeNode {
+    // 这个应该可以帮子类中有shared_ptr的析构
+    virtual Value *accept(syntax_tree_visitor &) = 0;
 };
 
-struct ASTProgram : ASTNode {
-    virtual Value *accept(ASTVisitor &) override final;
-    virtual ~ASTProgram() = default;
-    std::vector<std::shared_ptr<ASTDeclaration>> declarations;
+struct AstCompUnit : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstDeclDef>> DeclDefList;
 };
 
-struct ASTDeclaration : ASTNode {
-    virtual ~ASTDeclaration() = default;
-    CminusType type;
+struct AstDeclDef : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstConstDecl> ConstDecl;
+    std::shared_ptr<AstVarDecl> VarDecl;
+    std::shared_ptr<AstFuncDef> FuncDef;
+};
+
+struct AstConstDecl : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstConstDef>> ConstDefList;
+    BType type;
+};
+
+struct AstConstDefList {
+    std::vector<std::shared_ptr<AstConstDef>> list;
+};
+
+// struct AstBType;
+struct AstConstDef : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstConstExp>> ArrayConstExpList;
+    std::shared_ptr<AstConstInitVal> ConstInitVal;
     std::string id;
 };
 
-struct ASTFactor : ASTNode {
-    virtual ~ASTFactor() = default;
+struct AstArrayConstExpList {
+    std::vector<std::shared_ptr<AstConstExp>> list;
 };
 
-struct ASTNum : ASTFactor {
-    virtual Value *accept(ASTVisitor &) override final;
-    CminusType type;
-    union {
-        int i_val;
-        float f_val;
-    };
+struct AstConstInitVal : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstConstExp> ConstExp;
+    std::vector<std::shared_ptr<AstConstInitVal>> ConstInitValList;
+    std::vector<int> bounds;
 };
 
-struct ASTVarDeclaration : ASTDeclaration {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTNum> num;
+struct AstConstInitValList {
+    std::vector<std::shared_ptr<AstConstInitVal>> list;
 };
 
-struct ASTFunDeclaration : ASTDeclaration {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::vector<std::shared_ptr<ASTParam>> params;
-    std::shared_ptr<ASTCompoundStmt> compound_stmt;
+struct AstVarDecl : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstVarDef>> VarDefList;
+    BType type;
 };
 
-struct ASTParam : ASTNode {
-    virtual Value *accept(ASTVisitor &) override final;
-    CminusType type;
+struct AstVarDefList {
+    std::vector<std::shared_ptr<AstVarDef>> list;
+};
+
+struct AstVarDef : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
     std::string id;
-    // true if it is array param
+    std::vector<std::shared_ptr<AstConstExp>> ArrayConstExpList;
+    std::shared_ptr<AstInitVal> InitVal;
+};
+
+struct AstInitVal : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstInitVal>> InitValList;
+    std::shared_ptr<AstExp> Exp;
+    std::vector<int> bounds;
+};
+
+struct AstInitValList {
+    std::vector<std::shared_ptr<AstInitVal>> list;
+};
+
+struct AstFuncDef : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    BType type;
+    std::string id;
+    std::vector<std::shared_ptr<AstFuncFParam>> FuncFParamList;
+    std::shared_ptr<AstBlock> Block;
+};
+
+// struct AstFuncType;
+struct AstFuncFParamList {
+    std::vector<std::shared_ptr<AstFuncFParam>> list;
+};
+
+struct AstFuncFParam : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    BType type;
+    std::string id;
     bool isarray;
+    std::vector<std::shared_ptr<AstExp>> ParamArrayExpList;
 };
 
-struct ASTStatement : ASTNode {
-    virtual ~ASTStatement() = default;
+struct AstParamArrayExpList {
+    std::vector<std::shared_ptr<AstExp>> list;
 };
 
-struct ASTCompoundStmt : ASTStatement {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::vector<std::shared_ptr<ASTVarDeclaration>> local_declarations;
-    std::vector<std::shared_ptr<ASTStatement>> statement_list;
+struct AstBlock : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstBlockItem>> BlockItemList;
 };
 
-struct ASTExpressionStmt : ASTStatement {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTExpression> expression;
+struct AstBlockItemList {
+    std::vector<std::shared_ptr<AstBlockItem>> list;
 };
 
-struct ASTSelectionStmt : ASTStatement {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTExpression> expression;
-    std::shared_ptr<ASTStatement> if_statement;
-    // should be nullptr if no else structure exists
-    std::shared_ptr<ASTStatement> else_statement;
+struct AstBlockItem : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstConstDecl> ConstDecl;
+    std::shared_ptr<AstVarDecl> VarDecl;
+    std::shared_ptr<AstStmt> Stmt;
 };
 
-struct ASTIterationStmt : ASTStatement {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTExpression> expression;
-    std::shared_ptr<ASTStatement> statement;
+struct AstStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstBreakStmt> BreakStmt;
+    std::shared_ptr<AstContinueStmt> ContinueStmt;
+    std::shared_ptr<AstAssignStmt> AssignStmt;
+    std::shared_ptr<AstExp> Exp;
+    std::shared_ptr<AstBlock> Block;
+    std::shared_ptr<AstSelectStmt> SelectStmt;
+    std::shared_ptr<AstIterationStmt> IterationStmt;
+    std::shared_ptr<AstReturnStmt> ReturnStmt;
 };
 
-struct ASTReturnStmt : ASTStatement {
-    virtual Value *accept(ASTVisitor &) override final;
-    // should be nullptr if return void
-    std::shared_ptr<ASTExpression> expression;
+struct AstBreakStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
 };
 
-struct ASTExpression : ASTFactor {};
-
-struct ASTAssignExpression : ASTExpression {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTVar> var;
-    std::shared_ptr<ASTExpression> expression;
+struct AstContinueStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
 };
 
-struct ASTSimpleExpression : ASTExpression {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTAdditiveExpression> additive_expression_l;
-    std::shared_ptr<ASTAdditiveExpression> additive_expression_r;
-    RelOp op;
+struct AstAssignStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstLVal> LVal;
+    std::shared_ptr<AstExp> Exp;
 };
 
-struct ASTVar : ASTFactor {
-    virtual Value *accept(ASTVisitor &) override final;
+struct AstSelectStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstCond> Cond;
+    std::shared_ptr<AstStmt> ifStmt;
+    std::shared_ptr<AstStmt> elseStmt;
+};
+
+struct AstIterationStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstCond> Cond;
+    std::shared_ptr<AstStmt> Stmt;
+};
+
+struct AstReturnStmt : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstExp> Exp;
+};
+
+struct AstExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstAddExp> AddExp;
+};
+
+struct AstCond : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstLOrExp> LOrExp;
+};
+
+struct AstLVal : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::vector<std::shared_ptr<AstExp>> ArrayExpList;
     std::string id;
-    // nullptr if var is of int type
-    std::shared_ptr<ASTExpression> expression;
 };
 
-struct ASTAdditiveExpression : ASTNode {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTAdditiveExpression> additive_expression;
-    AddOp op;
-    std::shared_ptr<ASTTerm> term;
+struct AstArrayExpList {
+    std::vector<std::shared_ptr<AstExp>> list;
 };
 
-struct ASTTerm : ASTNode {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTTerm> term;
+struct AstPrimaryExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstExp> Exp;
+    std::shared_ptr<AstLVal> LVal;
+    std::shared_ptr<AstInteger> Integer;
+    std::shared_ptr<AstFloat> Float;
+};
+
+struct AstInteger : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    int32_t _int;
+};
+
+struct AstFloat : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    float _float;
+};
+
+struct AstUnaryExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    UnaryOp op;
+    std::shared_ptr<AstPrimaryExp> PrimaryExp;
+    std::shared_ptr<AstCallee> Callee;
+    std::shared_ptr<AstUnaryExp> UnaryExp;
+};
+
+struct AstCallee : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::string id;
+    std::vector<std::shared_ptr<AstExp>> ExpList;
+};
+
+// struct AstUnaryOp:AstTreeNode{};
+struct AstExpList {
+    std::vector<std::shared_ptr<AstExp>> list;
+};
+
+struct AstMulExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
     MulOp op;
-    std::shared_ptr<ASTFactor> factor;
+    std::shared_ptr<AstMulExp> MulExp;
+    std::shared_ptr<AstUnaryExp> UnaryExp;
 };
 
-struct ASTCall : ASTFactor {
-    virtual Value *accept(ASTVisitor &) override final;
-    std::string id;
-    std::vector<std::shared_ptr<ASTExpression>> args;
+struct AstAddExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    AddOp op;
+    std::shared_ptr<AstAddExp> AddExp;
+    std::shared_ptr<AstMulExp> MulExp;
 };
 
-class ASTVisitor {
-  public:
-    virtual Value *visit(ASTProgram &) = 0;
-    virtual Value *visit(ASTNum &) = 0;
-    virtual Value *visit(ASTVarDeclaration &) = 0;
-    virtual Value *visit(ASTFunDeclaration &) = 0;
-    virtual Value *visit(ASTParam &) = 0;
-    virtual Value *visit(ASTCompoundStmt &) = 0;
-    virtual Value *visit(ASTExpressionStmt &) = 0;
-    virtual Value *visit(ASTSelectionStmt &) = 0;
-    virtual Value *visit(ASTIterationStmt &) = 0;
-    virtual Value *visit(ASTReturnStmt &) = 0;
-    virtual Value *visit(ASTAssignExpression &) = 0;
-    virtual Value *visit(ASTSimpleExpression &) = 0;
-    virtual Value *visit(ASTAdditiveExpression &) = 0;
-    virtual Value *visit(ASTVar &) = 0;
-    virtual Value *visit(ASTTerm &) = 0;
-    virtual Value *visit(ASTCall &) = 0;
+struct AstRelExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    RelOp op;
+    std::shared_ptr<AstRelExp> RelExp;
+    std::shared_ptr<AstAddExp> AddExp;
 };
 
-class ASTPrinter : public ASTVisitor {
-  public:
-    virtual Value *visit(ASTProgram &) override final;
-    virtual Value *visit(ASTNum &) override final;
-    virtual Value *visit(ASTVarDeclaration &) override final;
-    virtual Value *visit(ASTFunDeclaration &) override final;
-    virtual Value *visit(ASTParam &) override final;
-    virtual Value *visit(ASTCompoundStmt &) override final;
-    virtual Value *visit(ASTExpressionStmt &) override final;
-    virtual Value *visit(ASTSelectionStmt &) override final;
-    virtual Value *visit(ASTIterationStmt &) override final;
-    virtual Value *visit(ASTReturnStmt &) override final;
-    virtual Value *visit(ASTAssignExpression &) override final;
-    virtual Value *visit(ASTSimpleExpression &) override final;
-    virtual Value *visit(ASTAdditiveExpression &) override final;
-    virtual Value *visit(ASTVar &) override final;
-    virtual Value *visit(ASTTerm &) override final;
-    virtual Value *visit(ASTCall &) override final;
-    void add_depth() { depth += 2; }
-    void remove_depth() { depth -= 2; }
+struct AstEqExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
 
-  private:
+    EqOp op;
+    std::shared_ptr<AstEqExp> EqExp;
+    std::shared_ptr<AstRelExp> RelExp;
+};
+
+struct AstLAndExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    LogicOp op;
+    std::shared_ptr<AstLAndExp> LAndExp;
+    std::shared_ptr<AstEqExp> EqExp;
+};
+
+struct AstLOrExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    LogicOp op;
+    std::shared_ptr<AstLOrExp> LOrExp;
+    std::shared_ptr<AstLAndExp> LAndExp;
+};
+
+struct AstConstExp : AstTreeNode {
+    virtual Value *accept(syntax_tree_visitor &) final;
+
+    std::shared_ptr<AstAddExp> AddExp;
+};
+
+class syntax_tree_visitor {
+public:
+    virtual Value *visit(AstCond &) = 0;
+
+    virtual Value *visit(AstExp &) = 0;
+
+    virtual Value *visit(AstConstExp &) = 0;
+
+    virtual Value *visit(AstCompUnit &) = 0;
+
+    virtual Value *visit(AstConstDecl &) = 0;
+
+    virtual Value *visit(AstConstDef &) = 0;
+
+    virtual Value *visit(AstConstInitVal &) = 0;
+
+    virtual Value *visit(AstVarDecl &) = 0;
+
+    virtual Value *visit(AstVarDef &) = 0;
+
+    virtual Value *visit(AstInitVal &) = 0;
+
+    virtual Value *visit(AstFuncDef &) = 0;
+
+    virtual Value *visit(AstFuncFParam &) = 0;
+
+    virtual Value *visit(AstBlock &) = 0;
+
+    virtual Value *visit(AstBreakStmt &) = 0;
+
+    virtual Value *visit(AstContinueStmt &) = 0;
+
+    virtual Value *visit(AstAssignStmt &) = 0;
+
+    virtual Value *visit(AstSelectStmt &) = 0;
+
+    virtual Value *visit(AstIterationStmt &) = 0;
+
+    virtual Value *visit(AstReturnStmt &) = 0;
+
+    virtual Value *visit(AstLVal &) = 0;
+
+    virtual Value *visit(AstPrimaryExp &) = 0;
+
+    virtual Value *visit(AstInteger &) = 0;
+
+    virtual Value *visit(AstFloat &) = 0;
+
+    virtual Value *visit(AstUnaryExp &) = 0;
+
+    virtual Value *visit(AstCallee &) = 0;
+
+    virtual Value *visit(AstMulExp &) = 0;
+
+    virtual Value *visit(AstAddExp &) = 0;
+
+    virtual Value *visit(AstRelExp &) = 0;
+
+    virtual Value *visit(AstEqExp &) = 0;
+
+    virtual Value *visit(AstLAndExp &) = 0;
+
+    virtual Value *visit(AstLOrExp &) = 0;
+};
+
+class syntax_tree_printer : public syntax_tree_visitor {
+public:
+    Value *visit(AstCompUnit &) final;
+
+    Value *visit(AstConstDecl &) final;
+
+    Value *visit(AstConstDef &) final;
+
+    Value *visit(AstConstInitVal &) final;
+
+    Value *visit(AstVarDecl &) final;
+
+    Value *visit(AstVarDef &) final;
+
+    Value *visit(AstInitVal &) final;
+
+    Value *visit(AstFuncDef &) final;
+
+    Value *visit(AstFuncFParam &) final;
+
+    Value *visit(AstBlock &) final;
+
+    Value *visit(AstBreakStmt &) final;
+
+    Value *visit(AstContinueStmt &) final;
+
+    Value *visit(AstAssignStmt &) final;
+
+    Value *visit(AstSelectStmt &) final;
+
+    Value *visit(AstIterationStmt &) final;
+
+    Value *visit(AstReturnStmt &) final;
+
+    Value *visit(AstLVal &) final;
+
+    Value *visit(AstPrimaryExp &) final;
+
+    Value *visit(AstInteger &) final;
+
+    Value *visit(AstFloat &) final;
+
+    Value *visit(AstUnaryExp &) final;
+
+    Value *visit(AstCallee &) final;
+
+    Value *visit(AstMulExp &) final;
+
+    Value *visit(AstAddExp &) final;
+
+    Value *visit(AstRelExp &) final;
+
+    Value *visit(AstEqExp &) final;
+
+    Value *visit(AstLAndExp &) final;
+
+    Value *visit(AstLOrExp &) final;
+
+    Value *visit(AstConstExp &) final;
+
+    Value *visit(AstExp &) final;
+
+    Value *visit(AstCond &) final;
+
+    void add_depth() { depth += 4; }
+
+    void remove_depth() {
+      depth -= 4;
+    }
+
+private:
     int depth = 0;
 };

@@ -7,7 +7,7 @@ void LogWriter::operator<(const LogStream &stream) {
 }
 
 void LogWriter::output_log(const std::ostringstream &msg) {
-    if (log_level_ >= env_log_level)
+    // if (log_level_ >= env_log_level)
         std::cout << "[" << level2string(log_level_) << "] " 
                     << "(" <<  location_.file_ 
                     << ":" << location_.line_ 

@@ -111,7 +111,8 @@ suite = [
 
 def eval():
     f = open("eval_result", 'w')
-    EXE_PATH = "../../../build/cminusfc"
+    BUILD_DIR = "../../../cmake-build-debug/"
+    EXE_PATH = BUILD_DIR + "cminusfc"
     TEST_BASE_PATH = "./testcases/"
     ANSWER_BASE_PATH = "./answers/"
     total_points = 0
@@ -132,13 +133,14 @@ def eval():
             COMMAND = [TEST_PATH]
 
             try:
+                print([EXE_PATH, "-o", TEST_PATH + ".ll", "-emit-llvm", TEST_PATH + ".cminus"])
                 result = subprocess.run([EXE_PATH, "-o", TEST_PATH + ".ll", "-emit-llvm", TEST_PATH + ".cminus"], stderr=subprocess.PIPE, timeout=1)
             except Exception as _:
                 f.write('\tFail\n')
                 continue
 
             if result.returncode == 0:
-                subprocess.run(["clang", "-O0", "-w", "-no-pie", TEST_PATH + ".ll", "-o", TEST_PATH, "-L", "../../../build", "-lcminus_io"])
+                subprocess.run(["clang", "-O0", "-w", "-no-pie", TEST_PATH + ".ll", "-o", TEST_PATH, "-L", BUILD_DIR, "-lcminus_io"])
                 input_option = None
                 if need_input:
                     with open(ANSWER_PATH + ".in", "rb") as fin:

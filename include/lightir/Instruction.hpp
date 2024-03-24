@@ -49,9 +49,13 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
         getelementptr,
         zext, // zero extend
         fptosi,
-        sitofp
-        // float binary operators Logical operators
+        sitofp,
+        // float binary operators
 
+        // Logical operators
+        And,
+        Or,
+        Not,
     };
     /* @parent: if parent!=nullptr, auto insert to bb
      * @ty: result type */
@@ -102,9 +106,13 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
     bool is_gep() const { return op_id_ == getelementptr; }
     bool is_zext() const { return op_id_ == zext; }
 
+    bool is_and() const { return op_id_ == And; }
+    bool is_or() const { return op_id_ == Or; }
+    bool is_not() const { return op_id_ == Not; }
+
     bool isBinary() const {
         return (is_add() || is_sub() || is_mul() || is_div() || is_fadd() ||
-                is_fsub() || is_fmul() || is_fdiv()) &&
+                is_fsub() || is_fmul() || is_fdiv() || is_and() || is_or()) &&
                (get_num_operand() == 2);
     }
 
@@ -138,6 +146,9 @@ class IBinaryInst : public BaseInst<IBinaryInst> {
     static IBinaryInst *create_sub(Value *v1, Value *v2, BasicBlock *bb);
     static IBinaryInst *create_mul(Value *v1, Value *v2, BasicBlock *bb);
     static IBinaryInst *create_sdiv(Value *v1, Value *v2, BasicBlock *bb);
+
+    static IBinaryInst *create_and(Value *v1, Value *v2, BasicBlock *bb);
+    static IBinaryInst *create_or(Value *v1, Value *v2, BasicBlock *bb);
 
     virtual std::string print() override;
 };

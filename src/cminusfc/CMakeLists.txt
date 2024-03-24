@@ -16,5 +16,5 @@ target_link_libraries(
 
 install(
     TARGETS cminusfc
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION bin #RUNTIME 用于安装可执行文件
 )

@@ -1,4 +1,3 @@
-add_subdirectory(calculator)
 add_executable(
     gcd_array_generator
     ta_gcd/gcd_array_generator.cpp
