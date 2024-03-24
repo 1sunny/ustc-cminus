@@ -466,22 +466,19 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
   Value *pValue = valueWithType.val;
   Scope::VarType type = valueWithType.type;
   LOG_DEBUG << pValue->get_type()->print();
+  // 普通变量是地址
+  // 需要考虑全局变量, 全局变量直接是地址
+  // 形参数组一般是把alloc的用来存数组地址的地址存在scope中,后面每次访问也会先load出来数组的地址
+  // 直接定义的数组是直接alloc出存数组的地址,和全局变量一样
+  // 用一个flag来表示scope里面存的到底是地址的地址还是地址
+  Value *result = pValue;
+  if (type == Scope::VarType::ParamArray) {
+    context.from_param_array = true;
+    result = builder->create_load(pValue);
+  }
   if (lval.ArrayExpList.empty()) { // 这个也可能是传的数组名
-    Value *result = pValue;
-    if (type == Scope::VarType::ParamArray) {
-      result = builder->create_load(pValue);
-    }
     return result;
   } else {
-    // 普通变量是地址
-    // 需要考虑全局变量, 全局变量直接是地址
-    // 形参数组一般是把alloc的用来存数组地址的地址存在scope中,后面每次访问也会先load出来数组的地址
-    // 直接定义的数组是直接alloc出存数组的地址,和全局变量一样
-    // 用一个flag来表示scope里面存的到底是地址的地址还是地址
-    Value *result = pValue;
-    if (type == Scope::VarType::ParamArray) {
-      result = builder->create_load(pValue);
-    }
     // param array 和 local定义的array访问区别:
     // define dso_local i32 @test4([6 x i32]* %0) #0 {
     //   %2 = alloca i32, align 4
@@ -649,16 +646,19 @@ Value* CminusfBuilder::visit(AstCallee &node) {
     // TODO 传数组应该传数组名(指针), 类型转换int,float
     Value *pValue = actual_param->accept(*this);
     if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
-      pValue = builder->create_gep(pValue, {CONST_INT(0), CONST_INT(0)});
+      if (not context.from_param_array) {
+        pValue = builder->create_gep(pValue, {CONST_INT(0), CONST_INT(0)});
+      }
     } else {
       MY_ASSERT(iterator->get_type()->is_float_type() || iterator->get_type()->is_integer_type());
-      if (iterator->get_type()->is_float_type() && pValue->get_type()->is_integer_type()) {
+      if (iterator->get_type()->is_float_type()) {
         pValue = to_float_type(pValue);
-      } else if (iterator->get_type()->is_int32_type() && pValue->get_type()->is_float_type()) {
+      } else if (iterator->get_type()->is_int32_type()) {
         pValue = to_int32_type(pValue);
       }
     }
     context.load_lval = true;
+    context.from_param_array = false;
     actual_params.push_back(pValue);
     iterator++;
   }
