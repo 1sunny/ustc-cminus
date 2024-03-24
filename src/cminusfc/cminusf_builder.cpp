@@ -509,7 +509,7 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
 
       if (auto constInt = to_const<ConstantInt>(offset); constInt) {
         if (constInt->get_value() < 0) {
-          semantic_error() << "negative index exception\n";
+          semantic_error() << "negative index exception.\n";
         }
       }
       // fix bug: {offset} -> {CONST_INT(0), offset}
@@ -618,12 +618,26 @@ Value* CminusfBuilder::visit(AstIterationStmt &node) {
 }
 
 Value* CminusfBuilder::visit(AstReturnStmt &node) {
+  Type *return_type = context.func->get_return_type();
+
   if (node.Exp == nullptr) {
+    if (return_type != VOID_T) {
+      semantic_error() << "function '" << context.func->get_name() << "' return type mismatch.\n";
+    }
     builder->create_void_ret();
   } else {
+    if (return_type == VOID_T) {
+      semantic_error() << "function '" << context.func->get_name() << "' return type mismatch.\n";
+    }
     // TODO: The given code is incomplete.
     // You need to solve other return cases (e.g. return an integer).
     Value *value = node.Exp->accept(*this);
+    MY_ASSERT(return_type->is_float_type() || return_type->is_integer_type());
+    if (return_type == INT32_T) {
+      value = to_int32_type(value);
+    } else if (return_type == FLOAT_T) {
+      value = to_float_type(value);
+    }
     builder->create_ret(value);
   }
   return nullptr;
