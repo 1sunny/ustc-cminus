@@ -40,12 +40,13 @@ class driver;
 %token GT 265 GTE 266 EQ 267 NEQ 268 ASSIN 269 SEMICOLON 270
 %token COMMA 271 LPARENTHESE 272 RPARENTHESE 273 LBRACKET 274
 %token RBRACKET 275 LBRACE 276 RBRACE 277 ELSE 278 IF 279
-%token INT 280 RETURN 281 VOID 282 WHILE 283
-%token <std::string>IDENTIFIER 284
-%token <int>NUMBER 285 // TODO float
-%token ARRAY 286 LETTER 287 EOL 288 COMMENT 289
-%token BLANK 290 CONST 291 BREAK 292 CONTINUE 293 NOT 294
-%token AND 295 OR 296 MOD 297
+%token INT 280 FLOAT 281 RETURN 282 VOID 283 WHILE 284
+%token <std::string>IDENTIFIER 285
+%token <int>INTEGER_CONST 286 // TODO float
+%token <float>FLOAT_CONST 287
+%token ARRAY 288 LETTER 289 EOL 290 COMMENT 291
+%token BLANK 292 CONST 293 BREAK 294 CONTINUE 295 NOT 296
+%token AND 297 OR 298 MOD 299
 
 %type <AstCompUnit*>CompUnit
 %type <AstDeclDef*>DeclDef
@@ -80,7 +81,8 @@ class driver;
 %type <AstLVal*>LVal
 %type <AstArrayExpList*>ArrayExpList
 %type <AstPrimaryExp*>PrimaryExp
-%type <AstNumber*>Number
+%type <AstInteger*>Integer
+%type <AstFloat*>Float
 %type <AstUnaryExp*>UnaryExp
 %type <AstCallee*>Callee
 %type <UnaryOp>UnaryOp
@@ -100,7 +102,7 @@ class driver;
 Begin:
     CompUnit END {
       drv.compUnitResult = std::shared_ptr<AstCompUnit>($1);
-      auto printer=new syntax_tree_printer;
+      auto printer = new syntax_tree_printer;
       printer->visit(*$1);
       return 0;
     }
@@ -117,35 +119,35 @@ CompUnit:
 
 DeclDef:
     ConstDecl {
-        $$=new AstDeclDef();
-        $$->ConstDecl=std::shared_ptr<AstConstDecl>($1);
-        $$->VarDecl=nullptr;
-        $$->FuncDef=nullptr;
+        $$ = new AstDeclDef();
+        $$->ConstDecl = std::shared_ptr<AstConstDecl>($1);
+        $$->VarDecl = nullptr;
+        $$->FuncDef = nullptr;
     }
     | VarDecl {
-        $$=new AstDeclDef();
-        $$->ConstDecl=nullptr;
-        $$->VarDecl=std::shared_ptr<AstVarDecl>($1);
-        $$->FuncDef=nullptr;
+        $$ = new AstDeclDef();
+        $$->ConstDecl = nullptr;
+        $$->VarDecl = std::shared_ptr<AstVarDecl>($1);
+        $$->FuncDef = nullptr;
     }
     | FuncDef {
-        $$=new AstDeclDef();
-        $$->ConstDecl=nullptr;
-        $$->VarDecl=nullptr;
-        $$->FuncDef=std::shared_ptr<AstFuncDef>($1);
+        $$ = new AstDeclDef();
+        $$->ConstDecl = nullptr;
+        $$->VarDecl = nullptr;
+        $$->FuncDef = std::shared_ptr<AstFuncDef>($1);
     };
 
 ConstDecl:
     CONST BType ConstDefList SEMICOLON {
-        $$=new AstConstDecl();
+        $$ = new AstConstDecl();
         $$->ConstDefList.swap($3->list);
-        $$->type=TYPE_INT;
+        $$->type = $2;
     };
 
 ConstDefList:
     ConstDefList COMMA ConstDef {
         $1->list.push_back(std::shared_ptr<AstConstDef>($3));
-        $$=$1;
+        $$ = $1;
     }
     | ConstDef {
         $$ = new AstConstDefList();
@@ -198,7 +200,7 @@ VarDecl:
     BType VarDefList SEMICOLON {
         $$ = new AstVarDecl();
         $$->VarDefList.swap($2->list);
-        $$->type = TYPE_INT;
+        $$->type = $1;
     };
 
 VarDefList:
@@ -277,6 +279,9 @@ BType:
     }
     | INT {
         $$ = TYPE_INT;
+    }
+    | FLOAT {
+        $$ = TYPE_FLOAT;
     };
 
 FuncFParamList:
@@ -292,14 +297,14 @@ FuncFParamList:
 FuncFParam:
     BType IDENTIFIER ParamArrayExpList {
         $$ = new AstFuncFParam();
-        $$->type = TYPE_INT;
+        $$->type = $1;
         $$->isarray = 1;
         $$->id = $2;
         $$->ParamArrayExpList.swap($3->list);
     }
     | BType IDENTIFIER {
         $$ = new AstFuncFParam();
-        $$->type = TYPE_INT;
+        $$->type = $1;
         $$->id = $2;
         $$->isarray = 0;
     };
@@ -529,25 +534,41 @@ PrimaryExp:
         $$ = new AstPrimaryExp();
         $$->Exp = std::shared_ptr<AstExp>($2);
         $$->LVal = nullptr;
-        $$->Number = nullptr;
+        $$->Integer = nullptr;
+        $$->Float = nullptr;
     }
     | LVal {
         $$ = new AstPrimaryExp();
         $$->Exp = nullptr;
         $$->LVal = std::shared_ptr<AstLVal>($1);
-        $$->Number = nullptr;
+        $$->Integer = nullptr;
+        $$->Float = nullptr;
     }
-    | Number {
+    | Integer {
         $$ = new AstPrimaryExp();
         $$->Exp = nullptr;
         $$->LVal = nullptr;
-        $$->Number = std::shared_ptr<AstNumber>($1);
+        $$->Integer = std::shared_ptr<AstInteger>($1);
+        $$->Float = nullptr;
+    }
+    | Float {
+        $$ = new AstPrimaryExp();
+        $$->Exp = nullptr;
+        $$->LVal = nullptr;
+        $$->Integer = nullptr;
+        $$->Float = std::shared_ptr<AstFloat>($1);
     };
 
-Number:
-    NUMBER {
-        $$ = new AstNumber();
-        $$->num = $1;
+Integer:
+    INTEGER_CONST {
+        $$ = new AstInteger();
+        $$->_int = $1;
+    };
+
+Float:
+    FLOAT_CONST {
+        $$ = new AstFloat();
+        $$->_float = $1;
     };
 
 UnaryExp:

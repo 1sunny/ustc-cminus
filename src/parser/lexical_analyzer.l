@@ -6,6 +6,12 @@
 # define YY_USER_ACTION  loc.columns (yyleng);
 
 %}
+SINGLE_LINE_COMMENT "//".*$
+MULTI_LINE_COMMENT "/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
+IDENTIFIER [a-zA-Z_][a-zA-Z0-9_]*
+INTEGER ([1-9][0-9]*|0[0-7]*|(0x|0X)[0-9a-fA-F]*)
+DEC_FP ((([0-9]*[.][0-9]*([eE][+-]?[0-9]+)?)|([0-9]+[eE][+-]?[0-9]+))[fLlL]?)
+HEX_FP (0[xX](([0-9A-Fa-f]*[.][0-9A-Fa-f]*([pP][+-]?[0-9]+)?)|([0-9A-Fa-f]+[pP][+-]?[0-9]+))[fLlL]?)
 
 %%
 %{
@@ -16,6 +22,7 @@
 %}
 
 int         {return yy::parser::make_INT(loc);}
+float       {return yy::parser::make_FLOAT(loc);}
 else        {return yy::parser::make_ELSE(loc);}
 if          {return yy::parser::make_IF(loc);}
 return      {return yy::parser::make_RETURN(loc);}
@@ -51,12 +58,13 @@ continue    {return yy::parser::make_CONTINUE(loc);}
 "\n"        {loc.lines(yyleng);}
 [ \t\r\f\v] {}
 "[]" 		{return yy::parser::make_ARRAY(loc);}
-"/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"          {}
-"//".*$						               {}
-[a-zA-Z_][a-zA-Z0-9_]* 					   {return yy::parser::make_IDENTIFIER(yytext, loc);}
-([1-9][0-9]*|0[0-7]*|(0x|0X)[0-9a-fA-F]*)  {return yy::parser::make_NUMBER(std::stoi(yytext,nullptr,0),loc);}
-<<EOF>>                                    {return yy::parser::make_END(loc);}
-.			{std::cerr << "Unknown Character !!!" << yytext << '\n'; exit(1);}
+{MULTI_LINE_COMMENT}    {}
+{SINGLE_LINE_COMMENT}   {}
+{IDENTIFIER}            {return yy::parser::make_IDENTIFIER(yytext, loc);}
+{INTEGER}               {return yy::parser::make_INTEGER_CONST(std::stoi(yytext,nullptr,0),loc);}
+({DEC_FP}|{HEX_FP})     {return yy::parser::make_FLOAT_CONST(std::stof(yytext,nullptr),loc);}
+<<EOF>>                 {return yy::parser::make_END(loc);}
+.			{std::cerr << "Unknown Character: " << yytext << '\n'; exit(1);}
 
 %%
 
