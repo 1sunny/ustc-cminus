@@ -496,6 +496,10 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
     // }
     for (const auto &exp: lval.ArrayExpList) {
       Value *offset = exp->accept(*this);
+      MY_ASSERT(offset->get_type()->is_float_type() || offset->get_type()->is_integer_type());
+      // make sure offset is int type
+      offset = to_int32_type(offset);
+
       int index = to_int(offset);
       MY_ASSERT(index >= 0);
       // fix bug: {offset} -> {CONST_INT(0), offset}
@@ -883,7 +887,11 @@ Value* CminusfBuilder::const_float_op(ConstantFP* left, ConstantFP* right, EqOp 
 
 Value* CminusfBuilder::to_int32_type(Value* value) {
   if (value->get_type()->is_float_type()) {
-    return builder->create_fptosi(value, INT32_T);
+    if (auto constFp = dynamic_cast<ConstantFP*>(value); constFp) {
+      return CONST_INT((int)constFp->get_value());
+    } else {
+      return builder->create_fptosi(value, INT32_T);
+    }
   }
   if (value->get_type()->is_int32_type()) {
     return value;
