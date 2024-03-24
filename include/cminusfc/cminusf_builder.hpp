@@ -186,7 +186,7 @@ class CminusfBuilder : public syntax_tree_visitor {
         };
         std::vector<IfCondBB> CondBBStack;
         std::vector<WhileCondBB> WhileCondBBStack;
-        bool load_lval{true};
+        std::vector<bool> load_lval{true};
         bool from_param_array{false};
     } context;
 

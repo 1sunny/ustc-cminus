@@ -502,7 +502,9 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
     //   ret i32 %14
     // }
     for (const auto &exp: lval.ArrayExpList) {
+      context.load_lval.push_back(true);
       Value *offset = exp->accept(*this);
+      context.load_lval.pop_back();
       MY_ASSERT(offset->get_type()->is_float_type() || offset->get_type()->is_integer_type());
       // make sure offset is int type
       offset = to_int32_type(offset);
@@ -526,10 +528,13 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
 
 Value* CminusfBuilder::visit(AstAssignStmt &node) {
   MY_ASSERT(node.Exp && node.LVal);
+  context.load_lval.push_back(true);
   Value *value = node.Exp->accept(*this);
-  context.load_lval = false;
+  context.load_lval.pop_back();
+
+  context.load_lval.push_back(false);
   Value *loc = node.LVal->accept(*this);
-  context.load_lval = true;
+  context.load_lval.pop_back();
   // TODO 类型转换
   Type *loc_type = loc->get_type()->get_pointer_element_type();
   MY_ASSERT(loc->get_type()->is_pointer_type()
@@ -655,7 +660,7 @@ Value* CminusfBuilder::visit(AstCallee &node) {
   for (int i = 0; i < node.ExpList.size(); i++) {
     std::shared_ptr<AstExp> actual_param = node.ExpList[i];
     if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
-      context.load_lval = false;
+      context.load_lval.push_back(false);
     }
     // TODO 传数组应该传数组名(指针), 类型转换int,float
     Value *pValue = actual_param->accept(*this);
@@ -671,7 +676,9 @@ Value* CminusfBuilder::visit(AstCallee &node) {
         pValue = to_int32_type(pValue);
       }
     }
-    context.load_lval = true;
+    if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
+      context.load_lval.pop_back();
+    }
     context.from_param_array = false;
     actual_params.push_back(pValue);
     iterator++;
@@ -684,7 +691,7 @@ Value* CminusfBuilder::visit(AstLVal &node) {
   Value *loc = get_lval_location(node);
   // 什么时候create_load呢? Assign左边的lval不应该,但右边的exp就应该, 函数传参时普通变量应该load,数组传参不应该load
   // const变量应该直接返回第一次创建的变量,不要load,
-  return context.load_lval ? builder->create_load(loc) : loc;
+  return context.load_lval.back() ? builder->create_load(loc) : loc;
 }
 
 Value* CminusfBuilder::visit(AstPrimaryExp &node) {
