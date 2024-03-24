@@ -15,6 +15,16 @@ Type *INT32PTR_T;
 Type *FLOAT_T;
 Type *FLOATPTR_T;
 
+int num_semantic_error;
+
+std::ostream& semantic_stream = std::cout;
+
+std::ostream& semantic_error() {
+  num_semantic_error++;
+  semantic_stream << "semantic error: ";
+  return semantic_stream;
+}
+
 // 先将所有函数都ASSERT表示还未实现
 
 inline int to_int(Value* value) {
@@ -500,8 +510,11 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
       // make sure offset is int type
       offset = to_int32_type(offset);
 
-      int index = to_int(offset);
-      MY_ASSERT(index >= 0);
+      if (auto constInt = to_const<ConstantInt>(offset); constInt) {
+        if (constInt->get_value() < 0) {
+          semantic_error() << "negative index exception\n";
+        }
+      }
       // fix bug: {offset} -> {CONST_INT(0), offset}
       if (type == Scope::VarType::ParamArray) {
         result = builder->create_gep(result, {offset});
