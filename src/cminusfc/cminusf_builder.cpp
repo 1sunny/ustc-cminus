@@ -155,6 +155,7 @@ void CminusfBuilder::initializeArray(int u, int& curr, std::vector<Value *>& arr
 // 的初始值为 Exp，其中可以引用变量，例如下图中的变量 e 的初始化表达式 d[2][1]。
 Value* CminusfBuilder::visit(AstVarDef &node) {
   LOG_DEBUG << node.id;
+  context.var_init = nullptr;
   context.array_init.clear();
   context.curr_array_type = nullptr;
   context.curr_id = node.id;
@@ -179,7 +180,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
           init = constant;
         } else {
           // TODO error
-          MY_ASSERT(false);
+          semantic_error() << "global init must be constant.\n";
         }
       } else { // node.InitVal
         init = ConstantZero::get(context.decl_type, module.get());
@@ -211,12 +212,21 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
     context.curr_array_type = array_type;
     context.max_column = array_exps_int.back();
 
+    if (node.InitVal) {
+      node.InitVal->accept(*this);
+      // 补齐缺省的元素，已添加的肯定是合法的初始化方式
+      while (context.array_init.size() < count) {
+        context.array_init.push_back(nullptr);
+      }
+      MY_ASSERT(count == context.array_init.size());
+    }
+
     if (context.global) {
+      // cpp全局变量可以用已定义的全局变量初始化, C不行
+      // int y[3] = {x}; error: initializer element is not a compile-time constant
       Constant* init = nullptr;
 
-      if (node.InitVal) {
-        node.InitVal->accept(*this);
-        MY_ASSERT(count == context.array_init.size());
+      if (!context.array_init.empty()) {
         std::queue<Constant*> queue;
         for (const auto &item: context.array_init) {
           Value *pValue;
@@ -229,21 +239,27 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
           if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
             queue.push(constant);
           } else {
-            MY_ASSERT(false);
+            semantic_error() << "global init must be constant.\n";
           }
         }
         Type* curr_type = context.decl_type == INT32_T ? INT32_T : FLOAT_T;
+        int denominator = 1;
         for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
           int bound = *it;
-          curr_type = ArrayType::get(array_type, bound);
-          std::vector<Constant*> constants;
-          constants.reserve(bound);
-          for (int i = 0; i < bound; ++i) {
-            constants.push_back(queue.front());
-            queue.pop();
+          denominator *= bound;
+          curr_type = ArrayType::get(curr_type, bound);
+          MY_ASSERT(count % denominator == 0);
+          int step = count / denominator;
+          for (int i = 0; i < step; ++i) {
+            std::vector<Constant*> constants;
+            constants.reserve(bound);
+            for (int j = 0; j < bound; ++j) {
+              constants.push_back(queue.front());
+              queue.pop();
+            }
+            Constant *pArray = ConstantArray::get(static_cast<ArrayType *>(curr_type), constants);
+            queue.push(pArray);
           }
-          Constant *pArray = ConstantArray::get(static_cast<ArrayType *>(curr_type), constants);
-          queue.push(pArray);
         }
         MY_ASSERT(queue.size() == 1);
         init = queue.front();
@@ -255,27 +271,14 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
     } else { // context.global
       AllocaInst *pInst = builder->create_alloca(array_type);
       scope.push(node.id, pInst, Scope::VarType::LocalArray); // 应该放在node.InitVal前面, 比如 int a = a;
-      // TODO array_exps有用到吗
+      // TODO array_exps有用到吗, 可以用来检验数组访问是否合法
       // scope.push_array_exps(node.id, array_exps_int);
-      if (node.InitVal != nullptr) {
-        node.InitVal->accept(*this);
-        MY_ASSERT(count == context.array_init.size());
+      if (!context.array_init.empty()) {
         std::vector<Value*> pos{pInst};
         int curr = 0;
         initializeArray(0, curr, array_exps, pos, array_exps_int);
       }
       // TODO 怎么给所有元素初始化为 0?
-      // int a[2][2]={1,a[0][0]}; printf("%d", a[0][1]); => 1
-      // CSC不对:int a[3][3]={1,a[0][0]};
-      //     [ 3 x [ 3 x i32]]* %1  = Alloca Init 0
-      //     [ 3 x i32]* %2  = GEP [ 3 x [ 3 x i32]]* %1 i32 0
-      //     i32* %3  = GEP [ 3 x i32]* %2 i32 0
-      //     i32 %4  = Load i32* %3
-      //     [ 3 x i32]* %5  = GEP [ 3 x [ 3 x i32]]* %1 i32 0
-      //     i32* %6  = GEP [ 3 x i32]* %5 i32 0
-      //     Store i32 1 i32* %6
-      //     i32* %7  = GEP i32* %6 i32 1
-      //     Store i32 %4 i32* %7
     }
   }
   return nullptr;
@@ -311,9 +314,6 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
     for (const auto& initVal : node.InitValList) {
       MY_ASSERT(initVal->Exp != nullptr);
       tmp_init.push_back(initVal->Exp);
-      // Value *pValue = initVal->Exp->accept(*this);
-      // GetElementPtrInst *base = builder->create_gep(context.curr_array, {CONST_INT(0), CONST_INT(i)});
-      // builder->create_store(pValue, base);
     }
     while (tmp_init.size() < context.max_column) {
       tmp_init.push_back(nullptr);
@@ -329,21 +329,10 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
     if (initVal->Exp == nullptr) { // {...}
       MY_ASSERT(column % context.max_column == 0); // TODO report error
       column = 0; // ?
-      // GetElementPtrInst *base = builder->create_gep(context.curr_array, {CONST_INT(0), CONST_INT(row)});
       context.curr_array_type = context.curr_array_type->get_array_element_type();
       initVal->accept(*this);
       context.curr_array_type = saved_array_type;
     } else {
-      // Value *pValue = initVal->Exp->accept(*this);
-      // context.array_init.push_back(pValue);
-      // LOG_DEBUG << context.curr_array->get_type()->print();
-      // fix bug: {CONST_INT(row)} -> {CONST_INT(0), CONST_INT(row)}
-      // GetElementPtrInst *base = builder->create_gep(context.curr_array, {CONST_INT(0), CONST_INT(row)});
-      // LOG_DEBUG << base->get_type()->print();
-      // GetElementPtrInst *pInst = builder->create_gep(base, {CONST_INT(0), CONST_INT(column)});
-      // LOG_DEBUG << pInst->get_type()->print();
-      // builder->create_store(pValue, pInst);
-
       context.array_init.push_back(initVal->Exp);
       column++;
     }

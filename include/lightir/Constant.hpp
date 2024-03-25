@@ -8,7 +8,7 @@ class Constant : public User {
   private:
     // int value;
   public:
-    Constant(Type *ty, const std::string &name = "") : User(ty, name) {}
+    Constant(Type *ty, const std::string &name = "", unsigned num_ops = 0) : User(ty, name, num_ops) {}
     ~Constant() = default;
 };
 

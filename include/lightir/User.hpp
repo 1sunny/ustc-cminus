@@ -6,7 +6,7 @@
 
 class User : public Value {
   public:
-    User(Type *ty, const std::string &name = "") : Value(ty, name){};
+    User(Type *ty, const std::string &name = "", unsigned num_ops = 0);
     virtual ~User() { remove_all_operands(); }
 
     const std::vector<Value *> &get_operands() const { return operands_; }
@@ -26,6 +26,7 @@ class User : public Value {
 
   private:
     std::vector<Value *> operands_; // operands of this value
+    unsigned num_ops_;
 };
 
 /* For example: op = func(a, b)

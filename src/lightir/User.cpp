@@ -2,6 +2,12 @@
 
 #include <cassert>
 
+User::User(Type *ty, const std::string &name, unsigned num_ops)
+        : Value(ty, name), num_ops_(num_ops) {
+
+  operands_.resize(num_ops_, nullptr);
+}
+
 void User::set_operand(unsigned i, Value *v) {
     assert(i < operands_.size() && "set_operand out of index");
     if (operands_[i]) { // old operand

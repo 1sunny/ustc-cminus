@@ -20,6 +20,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
         sub,
         mul,
         sdiv,
+        srem, // TODO
         // float binary operators
         fadd,
         fsub,

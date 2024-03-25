@@ -31,6 +31,7 @@ def compile_and_run_cminusfc(source_file):
         if result_clang.returncode == 0:
             result_run = subprocess.run([os.path.splitext(source_file)[0]], input=input_option, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
             remove_file(os.path.splitext(source_file)[0])
+            remove_file(llvm_output)
             return result_run
     remove_file(llvm_output)
     return None
