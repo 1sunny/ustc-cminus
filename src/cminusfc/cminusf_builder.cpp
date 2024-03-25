@@ -35,18 +35,22 @@ inline int to_int(Value* value) {
   }
 }
 
+ConstantInt * CminusfBuilder::to_const_index(Value * value) {
+  if (auto* constInt = dynamic_cast<ConstantInt*>(to_int32_type(value)); constInt && constInt->get_value() >= 0) {
+    return constInt;
+  } else {
+    semantic_error() << "array bounds or index must be non-negative constants when declare.";
+  }
+  return nullptr;
+}
+
 std::vector<int> CminusfBuilder::to_indices(std::vector<Value*>& values) {
   std::vector<int> result;
   result.reserve(values.size());
   // TODO 需要确定一下是顺序还是逆序
   for (auto &item: values) {
-    item = to_int32_type (item);
     // TODO 如果 pInt->get_value()=0 ?
-    if (auto* constInt = dynamic_cast<ConstantInt*>(item); constInt && constInt->get_value() >= 0) {
-      result.push_back(constInt->get_value());
-    } else {
-      semantic_error() << "array bounds must be constants.";
-    }
+    result.push_back(to_const_index(item)->get_value());
   }
   return result;
 }
@@ -359,19 +363,27 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   // TODO void时FuncFParamList有吗? 这里要改,目前还没有void,需要添加
   for (std::shared_ptr<AstFuncFParam> &param: node.FuncFParamList) {
     // TODO: Please accomplish param_types.
-    Type *type;
+    Type *param_type;
     if (param->type == TYPE_INT) {
-      type = param->isarray ? INT32PTR_T : INT32_T;
+      param_type = INT32_T;
     } else if (param->type == TYPE_FLOAT) {
-      type = param->isarray ? FLOATPTR_T : FLOAT_T;
+      param_type = FLOAT_T;
     } else if (param->type == TYPE_VOID) {
       // TODO
-      assert("bType == TYPE_VOID");
+      assert("param->type == TYPE_VOID");
+    }
+    if (param->isarray) {
+      for (auto it = param->ParamArrayExpList.rbegin(); it != param->ParamArrayExpList.rend(); ++it) {
+        Value *exp = (*it)->accept(*this);
+        ConstantInt *bound = to_const_index(exp);
+        param_type = ArrayType::get(param_type, bound->get_value());
+      }
+      param_type = PointerType::get(param_type);
     }
     // 但其实clang是这样的:int a[][2][3] -> [2 x [3 x i32]]* %0, 会具体求出类型,而不是直接用ptr
     // push_back(std::move(type)): Std::move of the variable 'type' of the trivially-copyable type 'Type *' has no effect
     // std::move 主要用于将拥有资源的对象的所有权转移给另一个对象，对于指针这种轻量级的类型，使用 std::move 往往是不必要的
-    param_types.push_back(type);
+    param_types.push_back(param_type);
   }
 
   fun_type = FunctionType::get(ret_type, param_types);
@@ -395,17 +407,6 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
                                                     ? Scope::VarType::ParamArray : Scope::VarType::ParamVar);
 
     // // accept返回void,但是需要子节点的返回值Value*,怎么处理比较好?
-    // if (node.FuncFParamList[i]->isarray) {
-    //   std::vector<Value *> array_exps;
-    //   array_exps.push_back(CONST_INT(0));
-    //   for (const auto& array_param : node.FuncFParamList[i]->ParamArrayExpList) {
-    //     Value *exp = array_param->accept(*this);
-    //     array_exps.push_back(exp);
-    //   }
-    //   // Non-const lvalue reference to type 'vector<...>' cannot bind to a temporary of type 'vector<...>'
-    //   // push_array_exps 必须要用 const
-    //   scope.push_array_exps(node.FuncFParamList[i]->id, to_indices(array_exps));
-    // }
   }
 
   node.Block->accept(*this);

@@ -286,4 +286,6 @@ class CminusfBuilder : public syntax_tree_visitor {
 
     void initializeArray(int u, int& curr, std::vector<Value *> &array_exps, std::vector<Value *> &pos,
                          std::vector<int> array_exps_int);
+
+    ConstantInt *to_const_index(Value *value);
 };
