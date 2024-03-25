@@ -10,6 +10,12 @@ COLOR_RESET = "\033[0m"
 BUILD_DIR = "../cmake-build-debug/"  # 替换为实际的构建目录
 folder_path = ""
 
+def remove_file(path):
+    try:
+        os.remove(path)
+    except Exception as e:
+        pass
+
 def compile_and_run_cminusfc(source_file):
     input_option = None
     input_file = os.path.splitext(source_file)[0] + ".in"
@@ -24,13 +30,13 @@ def compile_and_run_cminusfc(source_file):
         result_clang = subprocess.run(["clang", "-O0", "-w", "-no-pie", llvm_output, "-o", os.path.splitext(source_file)[0], "-L", BUILD_DIR, "-lcminus_io"])
         if result_clang.returncode == 0:
             result_run = subprocess.run([os.path.splitext(source_file)[0]], input=input_option, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
-            os.remove(os.path.splitext(source_file)[0])
+            remove_file(os.path.splitext(source_file)[0])
             return result_run
-    os.remove(llvm_output)
+    remove_file(llvm_output)
     return None
 
 def main(folder_path):
-    for file in os.listdir(folder_path):
+    for file in sorted(os.listdir(folder_path)):
         if file.endswith(".sy"):
             sy_file = os.path.join(folder_path, file)
             out_file = os.path.join(folder_path, os.path.splitext(file)[0] + ".out")
@@ -42,8 +48,8 @@ def main(folder_path):
                     output = result.stdout.decode()
                     if len(output) != 0 and output[-1] != '\n':
                         output += '\n'
-                    output += str(result.returncode) + '\n'
-                    if output == expected_output:
+                    output += str(result.returncode)
+                    if output == expected_output.rstrip('\n'):
                         print(f"{COLOR_GREEN}Comparing output for {sy_file}: Success{COLOR_RESET}")
                     else:
                         print(f"{COLOR_RED}Comparing output for {sy_file}: Failed{COLOR_RESET}")
@@ -52,7 +58,7 @@ def main(folder_path):
                         return
                 else:
                     print(f"{COLOR_RED}Compilation failed for {sy_file}{COLOR_RESET}")
-                    return
+                    input()
             else:
                 print(f"{COLOR_RED}No corresponding .out file found for {sy_file}{COLOR_RESET}")
 
