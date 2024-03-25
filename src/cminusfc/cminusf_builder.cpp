@@ -35,16 +35,17 @@ inline int to_int(Value* value) {
   }
 }
 
-std::vector<int> to_indices(const std::vector<Value*>& values) {
+std::vector<int> CminusfBuilder::to_indices(std::vector<Value*>& values) {
   std::vector<int> result;
   result.reserve(values.size());
   // TODO 需要确定一下是顺序还是逆序
-  for (const auto &item: values) {
+  for (auto &item: values) {
+    item = to_int32_type (item);
     // TODO 如果 pInt->get_value()=0 ?
     if (auto* constInt = dynamic_cast<ConstantInt*>(item); constInt && constInt->get_value() >= 0) {
       result.push_back(constInt->get_value());
     } else {
-      MY_ASSERT(false);
+      semantic_error() << "array bounds must be constants.";
     }
   }
   return result;
@@ -118,6 +119,32 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
   return nullptr;
 }
 
+void CminusfBuilder::initializeArray(int u, int& curr, std::vector<Value *>& array_exps,
+                                     std::vector<Value*>& pos, std::vector<int> array_exps_int) {
+    if (u == array_exps.size()) {
+      // TODO context.array_init[curr++] = nullptr
+      Value* pValue;
+      if (context.array_init[curr] == nullptr) {
+        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                              : static_cast<Value*>(CONST_FP(0));
+        curr++;
+      } else {
+        pValue = context.array_init[curr++]->accept(*this);
+      }
+      LOG_DEBUG << pos.back()->get_type()->print();
+      builder->create_store(pValue, pos.back());
+      return;
+    }
+    pos.push_back(builder->create_gep(pos.back(), {CONST_INT(0), CONST_INT(0)}));
+    for (int i = 0; i < array_exps_int[u]; ++i) {
+      if (i != 0) {
+        pos.back() = builder->create_gep(pos.back(), {CONST_INT(1)});
+      }
+      initializeArray(u + 1, curr, array_exps, pos, array_exps_int);
+    }
+    pos.pop_back();
+}
+
 // 1. VarDef 用于定义变量。当不含有‘=’和初始值时，其运行时实际初值未定义。
 // 2. VarDef 的数组维度和各维长度的定义部分不存在时，表示定义单个变量。存
 // 在时，和 ConstDef 类似，表示定义多维数组。（参见 ConstDef 的第 2 点）
@@ -128,6 +155,7 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
 // 的初始值为 Exp，其中可以引用变量，例如下图中的变量 e 的初始化表达式 d[2][1]。
 Value* CminusfBuilder::visit(AstVarDef &node) {
   LOG_DEBUG << node.id;
+  context.array_init.clear();
   context.curr_array_type = nullptr;
   context.curr_id = node.id;
   std::vector<Value *> array_exps;
@@ -234,29 +262,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
         MY_ASSERT(count == context.array_init.size());
         std::vector<Value*> pos{pInst};
         int curr = 0;
-        std::function<void(int)> dfs = [&](int u) {
-          if (u == array_exps.size()) {
-            // TODO context.array_init[curr++] = nullptr
-            Value* pValue;
-            if (context.array_init[curr] == nullptr) {
-              pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
-                                                    : static_cast<Value*>(CONST_FP(0));
-            } else {
-              pValue = context.array_init[curr++]->accept(*this);
-            }
-            builder->create_store(pValue, pos.back());
-            return;
-          }
-          pos.push_back(builder->create_gep(pos.back(), {CONST_INT(0), CONST_INT(0)}));
-          for (int i = 0; i < array_exps_int[u]; ++i) {
-            if (i != 0) {
-              pos.back() = builder->create_gep(pos.back(), {CONST_INT(1)});
-            }
-            dfs(u + 1);
-          }
-          pos.pop_back();
-        };
-        dfs(0);
+        initializeArray(0, curr, array_exps, pos, array_exps_int);
       }
       // TODO 怎么给所有元素初始化为 0?
       // int a[2][2]={1,a[0][0]}; printf("%d", a[0][1]); => 1
@@ -298,8 +304,8 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
     return nullptr;
   }
   if (context.curr_array_type &&
-          (context.curr_array_type->get_pointer_element_type()->get_array_element_type() == INT32_T ||
-           context.curr_array_type->get_pointer_element_type()->get_array_element_type() == FLOAT_T)) {
+          (context.curr_array_type->get_array_element_type() == INT32_T ||
+           context.curr_array_type->get_array_element_type() == FLOAT_T)) {
     MY_ASSERT(node.InitValList.size() <= context.max_column);
     std::vector<std::shared_ptr<AstExp>> tmp_init;
     for (const auto& initVal : node.InitValList) {
@@ -324,7 +330,7 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
       MY_ASSERT(column % context.max_column == 0); // TODO report error
       column = 0; // ?
       // GetElementPtrInst *base = builder->create_gep(context.curr_array, {CONST_INT(0), CONST_INT(row)});
-      context.curr_array_type = context.curr_array_type->get_pointer_element_type()->get_array_element_type();
+      context.curr_array_type = context.curr_array_type->get_array_element_type();
       initVal->accept(*this);
       context.curr_array_type = saved_array_type;
     } else {

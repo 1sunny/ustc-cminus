@@ -281,4 +281,9 @@ class CminusfBuilder : public syntax_tree_visitor {
     Value *const_float_op(ConstantFP *left, ConstantFP *right, LogicOp op);
 
     Value *gen_cmp(Value *value);
+
+    std::vector<int> to_indices(std::vector<Value *> &values);
+
+    void initializeArray(int u, int& curr, std::vector<Value *> &array_exps, std::vector<Value *> &pos,
+                         std::vector<int> array_exps_int);
 };
