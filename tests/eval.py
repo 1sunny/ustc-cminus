@@ -39,12 +39,16 @@ def main(folder_path):
                 if result is not None:
                     with open(out_file, "r") as f:
                         expected_output = f.read()
-                    user_ouput = result.stdout.decode() + str(result.returncode) + "\n"
-                    if user_ouput == expected_output:
+                    output = result.stdout.decode()
+                    if len(output) != 0 and output[-1] != '\n':
+                        output += '\n'
+                    output += str(result.returncode) + '\n'
+                    if output == expected_output:
                         print(f"{COLOR_GREEN}Comparing output for {sy_file}: Success{COLOR_RESET}")
                     else:
-                        print("your output: ", user_ouput)
                         print(f"{COLOR_RED}Comparing output for {sy_file}: Failed{COLOR_RESET}")
+                        print("user output:", output)
+                        print("expected_output:", expected_output)
                         return
                 else:
                     print(f"{COLOR_RED}Compilation failed for {sy_file}{COLOR_RESET}")

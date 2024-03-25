@@ -103,7 +103,7 @@ Begin:
     CompUnit END {
       drv.compUnitResult = std::shared_ptr<AstCompUnit>($1);
       auto printer = new syntax_tree_printer;
-      printer->visit(*$1);
+      //printer->visit(*$1);
       return 0;
     }
 
