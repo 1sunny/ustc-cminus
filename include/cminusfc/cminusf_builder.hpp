@@ -96,6 +96,8 @@ class CminusfBuilder : public syntax_tree_visitor {
         auto *TyVoid = module->get_void_type();
         auto *TyInt32 = module->get_int32_type();
         auto *TyFloat = module->get_float_type();
+        auto *TyInt32Ptr = module->get_int32_ptr_type();
+        auto *TyFloatPtr = module->get_float_ptr_type();
 
         auto *input_type = FunctionType::get(TyInt32, {});
         auto *input_fun = Function::create(input_type, "input", module.get());
@@ -115,11 +117,54 @@ class CminusfBuilder : public syntax_tree_visitor {
         auto *neg_idx_except_fun = Function::create(
             neg_idx_except_type, "neg_idx_except", module.get());
 
+        auto *getint_type = FunctionType::get(TyInt32, {});
+        auto *getint_fun = Function::create(
+                getint_type, "getint", module.get());
+
+        auto *getch_type = FunctionType::get(TyInt32, {});
+        auto *getch_fun = Function::create(
+                getch_type, "getch", module.get());
+
+        auto *getfloat_type = FunctionType::get(TyFloat, {});
+        auto *getfloat_fun = Function::create(
+                getfloat_type, "getfloat", module.get());
+
+        auto *getarray_type = FunctionType::get(TyInt32, {TyInt32Ptr});
+        auto *getarray_fun = Function::create(getarray_type, "getarray", module.get());
+
+        auto *getfarray_type = FunctionType::get(TyInt32, {TyFloatPtr});
+        auto *getfarray_fun = Function::create(getfarray_type, "getfarray", module.get());
+
+        auto *putint_type = FunctionType::get(TyVoid, {TyInt32});
+        auto *putint_fun = Function::create(putint_type, "putint", module.get());
+
+        auto *putch_type = FunctionType::get(TyVoid, {TyInt32});
+        auto *putch_fun = Function::create(putch_type, "putch", module.get());
+
+        auto *putarray_type = FunctionType::get(TyVoid, {TyInt32, TyInt32Ptr});
+        auto *putarray_fun = Function::create(putarray_type, "putarray", module.get());
+
+        auto *putfloat_type = FunctionType::get(TyVoid, {TyFloat});
+        auto *putfloat_fun = Function::create(putfloat_type, "putfloat", module.get());
+
+        auto *putfarray_type = FunctionType::get(TyVoid, {TyInt32, TyFloatPtr});
+        auto *putfarray_fun = Function::create(putfarray_type, "putfarray", module.get());
+
         scope.enter();
         scope.push("input", input_fun, Scope::VarType::Function);
         scope.push("output", output_fun, Scope::VarType::Function);
         scope.push("outputFloat", output_float_fun, Scope::VarType::Function);
         scope.push("neg_idx_except", neg_idx_except_fun, Scope::VarType::Function);
+        scope.push("getint", getint_fun, Scope::VarType::Function);
+        scope.push("getch", getch_fun, Scope::VarType::Function);
+        scope.push("getfloat", getfloat_fun, Scope::VarType::Function);
+        scope.push("getarray", getarray_fun, Scope::VarType::Function);
+        scope.push("getfarray", getfarray_fun, Scope::VarType::Function);
+        scope.push("putint", putint_fun, Scope::VarType::Function);
+        scope.push("putch", putch_fun, Scope::VarType::Function);
+        scope.push("putarray", putarray_fun, Scope::VarType::Function);
+        scope.push("putfloat", putfloat_fun, Scope::VarType::Function);
+        scope.push("putfarray", putfarray_fun, Scope::VarType::Function);
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
