@@ -461,7 +461,7 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
   Scope::ValueWithType valueWithType = scope.find(lval.id);
   Value *pValue = valueWithType.val;
   Scope::VarType type = valueWithType.type;
-  LOG_DEBUG << pValue->get_type()->print();
+  LOG_DEBUG << "type: " << pValue->get_type()->print() << ", name: " << lval.id;
   // 普通变量是地址
   // 需要考虑全局变量, 全局变量直接是地址
   // 形参数组一般是把alloc的用来存数组地址的地址存在scope中,后面每次访问也会先load出来数组的地址
@@ -495,7 +495,8 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
     //   %14 = load i32, i32* %2, align 4
     //   ret i32 %14
     // }
-    for (const auto &exp: lval.ArrayExpList) {
+    for (int i = 0; i < lval.ArrayExpList.size(); i++) {
+      std::shared_ptr<AstExp> exp = lval.ArrayExpList[i];
       context.load_lval.push_back(true);
       Value *offset = exp->accept(*this);
       context.load_lval.pop_back();
@@ -509,7 +510,7 @@ Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
         }
       }
       // fix bug: {offset} -> {CONST_INT(0), offset}
-      if (type == Scope::VarType::ParamArray) {
+      if (type == Scope::VarType::ParamArray && i == 0) {
         result = builder->create_gep(result, {offset});
       } else {
         result = builder->create_gep(result, {CONST_INT(0), offset});
