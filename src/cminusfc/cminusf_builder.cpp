@@ -446,14 +446,14 @@ Value* CminusfBuilder::visit(AstBlock &node) {
 // TODO 测试多层 while
 Value* CminusfBuilder::visit(AstBreakStmt &node) {
   // TODO 应该在循环中才能使用 break
-  MY_ASSERT(!context.successorBB.empty());
-  builder->create_br(context.successorBB.back());
+  MY_ASSERT(!context.while_condBB_stack.empty());
+  builder->create_br(context.while_condBB_stack.back().exitBB);
   return nullptr;
 }
 
 Value* CminusfBuilder::visit(AstContinueStmt &node) {
-  MY_ASSERT(!context.condBB.empty());
-  builder->create_br(context.condBB.back());
+  MY_ASSERT(!context.while_condBB_stack.empty());
+  builder->create_br(context.while_condBB_stack.back().condBB);
   return nullptr;
 }
 
@@ -558,10 +558,10 @@ Value* CminusfBuilder::visit(AstSelectStmt &node) {
   auto trueBB = BasicBlock::create(module.get(), "trueBB" + no, context.func);
   auto falseBB = BasicBlock::create(module.get(), "falseBB" + no, context.func);
   auto exitBB = BasicBlock::create(module.get(), "exitBB" + no, context.func);
-  context.CondBBStack.push_back({trueBB, node.elseStmt == nullptr ? exitBB : falseBB});
+  context.logicBB_stack.push_back({trueBB, node.elseStmt == nullptr ? exitBB : falseBB});
 
   Value *last_value = node.Cond->accept(*this);
-  context.CondBBStack.pop_back();
+  context.logicBB_stack.pop_back();
   Value *cond = gen_cmp(last_value);
   builder->create_cond_br(cond, trueBB, node.elseStmt == nullptr ? exitBB : falseBB);
 
@@ -594,8 +594,8 @@ Value* CminusfBuilder::visit(AstIterationStmt &node) {
   auto loopBB = BasicBlock::create(module.get(), "loopBB" + no, context.func);
   auto exitBB = BasicBlock::create(module.get(), "successorBB" + no, context.func);
 
-  context.condBB.push_back(condBB);
-  context.successorBB.push_back(exitBB);
+  context.while_condBB_stack.push_back({condBB, exitBB});
+  context.logicBB_stack.push_back({loopBB, exitBB});
 
   if(not builder->get_insert_block()->is_terminated()) {
     builder->create_br(condBB);
@@ -605,6 +605,8 @@ Value* CminusfBuilder::visit(AstIterationStmt &node) {
   Value *pValue = gen_cmp(cond);
   builder->create_cond_br(pValue, loopBB, exitBB);
 
+  context.logicBB_stack.pop_back();
+
   builder->set_insert_point(loopBB);
   node.Stmt->accept(*this);
   if(not builder->get_insert_block()->is_terminated()) {
@@ -613,8 +615,7 @@ Value* CminusfBuilder::visit(AstIterationStmt &node) {
 
   builder->set_insert_point(exitBB);
 
-  context.condBB.pop_back();
-  context.successorBB.pop_back();
+  context.while_condBB_stack.pop_back();
   return nullptr;
 }
 
@@ -1060,7 +1061,7 @@ Value* CminusfBuilder::visit(AstLAndExp &node) {
     auto trueBB = BasicBlock::create(module.get(), "trueBB" + no, context.func);
     Value *left_last_value = node.LAndExp->accept(*this);
     Value *cond = gen_cmp(left_last_value);
-    builder->create_cond_br(cond, trueBB, context.CondBBStack.back().falseBB);
+    builder->create_cond_br(cond, trueBB, context.logicBB_stack.back().falseBB);
     builder->set_insert_point(trueBB);
     return node.EqExp->accept(*this);
   }
@@ -1072,11 +1073,11 @@ Value* CminusfBuilder::visit(AstLOrExp &node) {
   } else {
     std::string no = next_bb_num_string();
     auto falseBB = BasicBlock::create(module.get(), "falseBB"  + no, context.func);
-    context.CondBBStack.push_back({context.CondBBStack.back().trueBB, falseBB});
+    context.logicBB_stack.push_back({context.logicBB_stack.back().trueBB, falseBB});
     Value *left_last_value = node.LOrExp->accept(*this);
-    context.CondBBStack.pop_back();
+    context.logicBB_stack.pop_back();
     Value *cond = gen_cmp(left_last_value);
-    builder->create_cond_br(cond, context.CondBBStack.back().trueBB, falseBB);
+    builder->create_cond_br(cond, context.logicBB_stack.back().trueBB, falseBB);
     builder->set_insert_point(falseBB);
     return node.LAndExp->accept(*this);
   }

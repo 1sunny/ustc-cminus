@@ -216,21 +216,19 @@ class CminusfBuilder : public syntax_tree_visitor {
         Type* decl_type;
         Type* curr_array_type;
         int max_column;
-        std::vector<BasicBlock*> condBB;
-        std::vector<BasicBlock*> successorBB;
         bool global;
         std::shared_ptr<AstExp> var_init;
         std::vector<std::shared_ptr<AstExp>> array_init;
-        struct IfCondBB {
+        struct LogicBB {
             BasicBlock* trueBB{};
             BasicBlock* falseBB{};
         };
         struct WhileCondBB {
-            BasicBlock* loopBB{};
+            BasicBlock* condBB{};
             BasicBlock* exitBB{};
         };
-        std::vector<IfCondBB> CondBBStack;
-        std::vector<WhileCondBB> WhileCondBBStack;
+        std::vector<LogicBB> logicBB_stack;
+        std::vector<WhileCondBB> while_condBB_stack;
         std::vector<bool> load_lval{true};
         bool from_param_array{false};
     } context;
