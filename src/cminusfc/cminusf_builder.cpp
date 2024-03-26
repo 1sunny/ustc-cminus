@@ -783,6 +783,8 @@ Value* CminusfBuilder::int_op(Value* left, Value* right, MulOp op) {
     return builder->create_imul(left, right);
   } else if (op == MulOp::OP_DIV) {
     return builder->create_isdiv(left, right);
+  } else if (op == MulOp::OP_MOD) {
+    return builder->create_srem(left, right);
   } else {
     MY_ASSERT(false);
   }
@@ -793,6 +795,8 @@ Value* CminusfBuilder::const_int_op(ConstantInt* left, ConstantInt* right, MulOp
     return CONST_INT(left->get_value() * right->get_value());
   } else if (op == MulOp::OP_DIV) {
     return CONST_INT(left->get_value() / right->get_value());
+  } else if (op == MulOp::OP_MOD) {
+    return CONST_INT(left->get_value() % right->get_value());
   } else {
     MY_ASSERT(false);
   }
@@ -871,6 +875,9 @@ Value* CminusfBuilder::float_op(Value* left, Value* right, MulOp op) {
     return builder->create_fmul(left, right);
   } else if (op == MulOp::OP_DIV) {
     return builder->create_fdiv(left, right);
+  } else if (op == MulOp::OP_MOD) {
+    semantic_error() << "operands of binary operator % cannot be a float number";
+    return nullptr;
   } else {
     MY_ASSERT(false);
   }
@@ -881,6 +888,9 @@ Value* CminusfBuilder::const_float_op(ConstantFP* left, ConstantFP* right, MulOp
     return CONST_FP(left->get_value() * right->get_value());
   } else if (op == MulOp::OP_DIV) {
     return CONST_FP(left->get_value() / right->get_value());
+  } else if (op == MulOp::OP_MOD) {
+    semantic_error() << "operands of binary operator % cannot be a float number";
+    return nullptr;
   } else {
     MY_ASSERT(false);
   }

@@ -45,6 +45,9 @@ IBinaryInst *IBinaryInst::create_mul(Value *v1, Value *v2, BasicBlock *bb) {
 IBinaryInst *IBinaryInst::create_sdiv(Value *v1, Value *v2, BasicBlock *bb) {
     return create(sdiv, v1, v2, bb);
 }
+IBinaryInst *IBinaryInst::create_srem(Value *v1, Value *v2, BasicBlock *bb) {
+    return create(srem, v1, v2, bb);
+}
 IBinaryInst *IBinaryInst::create_and(Value *v1, Value *v2, BasicBlock *bb) {
     return create(And, v1, v2, bb);
 }
