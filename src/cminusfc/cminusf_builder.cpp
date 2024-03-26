@@ -103,7 +103,7 @@ Value* CminusfBuilder::visit(AstConstInitVal &node) {
 }
 
 Value* CminusfBuilder::visit(AstVarDecl &node) {
-  // 判断是否已经定义过
+  // TODO 判断是否已经定义过
   BType bType = node.type;
   Type* type;
   if (bType == TYPE_INT) {
@@ -115,7 +115,7 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
   }
 
   context.decl_type = type;
-  // int a=1,b=a; 能满足吗
+  // TODO int a=1,b=a; 能满足吗
   // 是在这里create_alloca还是在varDef
   for (std::shared_ptr<AstVarDef>& varDef : node.VarDefList) {
     varDef->accept(*this);
@@ -123,9 +123,9 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
   return nullptr;
 }
 
-void CminusfBuilder::initializeArray(int u, int& curr, std::vector<Value *>& array_exps,
+void CminusfBuilder::initializeArray(int u, int& curr,
                                      std::vector<Value*>& pos, std::vector<int> array_exps_int) {
-    if (u == array_exps.size()) {
+    if (u == array_exps_int.size()) {
       // TODO context.array_init[curr++] = nullptr
       Value* pValue;
       if (context.array_init[curr] == nullptr) {
@@ -144,9 +144,121 @@ void CminusfBuilder::initializeArray(int u, int& curr, std::vector<Value *>& arr
       if (i != 0) {
         pos.back() = builder->create_gep(pos.back(), {CONST_INT(1)});
       }
-      initializeArray(u + 1, curr, array_exps, pos, array_exps_int);
+      initializeArray(u + 1, curr, pos, array_exps_int);
     }
     pos.pop_back();
+}
+
+std::vector<int> CminusfBuilder::defInit(const std::string& id, std::vector<std::shared_ptr<AstConstExp>>& ArrayConstExpList) {
+  LOG_DEBUG << id;
+  context.var_init = nullptr;
+  context.array_init.clear();
+  context.curr_array_type = nullptr;
+  context.curr_id = id;
+  std::vector<Value *> array_exps;
+  array_exps.reserve(ArrayConstExpList.size());
+
+  for (std::shared_ptr<AstConstExp>& array_exp : ArrayConstExpList) {
+    Value *exp = array_exp->accept(*this);
+    MY_ASSERT(exp);
+    // TODO exp必须为非负整数,在下面处理了
+    array_exps.push_back(exp);
+  }
+  return to_indices(array_exps);
+}
+
+void CminusfBuilder::set_context_var_init(AstVarDef &node) {
+  if (node.InitVal) {
+    node.InitVal->accept(*this);
+    MY_ASSERT(context.var_init);
+  }
+}
+
+Constant* CminusfBuilder::get_global_constant_init(Value *init_value) {
+  Constant* init = nullptr;
+  if (init_value) {
+    if (auto* constant = dynamic_cast<Constant*>(init_value); constant) {
+      init = constant;
+    } else {
+      // TODO error
+      semantic_error() << "global init must be constant.\n";
+    }
+  } else { // node.InitVal
+    init = ConstantZero::get(context.decl_type, module.get());
+  }
+  return init;
+}
+
+Type* CminusfBuilder::set_context_array_type(std::vector<int> array_exps_int) {
+  Type* array_type = context.decl_type;
+  for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
+    array_type = ArrayType::get(array_type, *it);
+  }
+  context.curr_array_type = array_type;
+  return array_type;
+}
+
+void CminusfBuilder::set_contest_array_init_value(AstVarDef &node, std::vector<int> array_exps_int) {
+  if (node.InitVal) {
+    node.InitVal->accept(*this);
+    int count = 1;
+    for (int bound: array_exps_int) {
+      count *= bound;
+    }
+    // 补齐缺省的元素，已添加的肯定是合法的初始化方式
+    while (context.array_init.size() < count) {
+      context.array_init.push_back(nullptr);
+    }
+    MY_ASSERT(count == context.array_init.size());
+  }
+}
+
+Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::vector<int> array_exps_int) {
+  // cpp全局变量可以用已定义的全局变量初始化, C不行
+  // int y[3] = {x}; error: initializer element is not a compile-time constant
+  Constant* init = nullptr;
+
+  if (!context.array_init.empty()) {
+    std::queue<Constant*> queue;
+    for (const auto &item: context.array_init) {
+      Value *pValue;
+      if (item == nullptr) {
+        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                              : static_cast<Value*>(CONST_FP(0));
+      } else {
+        pValue = item->accept(*this);
+      }
+      if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
+        queue.push(constant);
+      } else {
+        semantic_error() << "global init must be constant.\n";
+      }
+    }
+    Type* curr_type = context.decl_type == INT32_T ? INT32_T : FLOAT_T;
+    int denominator = 1;
+    for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
+      int bound = *it;
+      denominator *= bound;
+      curr_type = ArrayType::get(curr_type, bound);
+      MY_ASSERT(context.array_init.size() % denominator == 0);
+      int step = context.array_init.size() / denominator;
+      for (int i = 0; i < step; ++i) {
+        std::vector<Constant*> constants;
+        constants.reserve(bound);
+        for (int j = 0; j < bound; ++j) {
+          constants.push_back(queue.front());
+          queue.pop();
+        }
+        Constant *pArray = ConstantArray::get(static_cast<ArrayType *>(curr_type), constants);
+        queue.push(pArray);
+      }
+    }
+    MY_ASSERT(queue.size() == 1);
+    init = queue.front();
+  } else { // node.InitVal
+    init = ConstantZero::get(array_type, module.get());
+  }
+  return init;
 }
 
 // 1. VarDef 用于定义变量。当不含有‘=’和初始值时，其运行时实际初值未定义。
@@ -158,37 +270,18 @@ void CminusfBuilder::initializeArray(int u, int& curr, std::vector<Value *>& arr
 // 4. VarDef 中表示各维长度的 ConstExp 必须是能求值到 非负整数，但 InitVal 中
 // 的初始值为 Exp，其中可以引用变量，例如下图中的变量 e 的初始化表达式 d[2][1]。
 Value* CminusfBuilder::visit(AstVarDef &node) {
-  LOG_DEBUG << node.id;
-  context.var_init = nullptr;
-  context.array_init.clear();
-  context.curr_array_type = nullptr;
-  context.curr_id = node.id;
-  std::vector<Value *> array_exps;
-  array_exps.reserve(node.ArrayConstExpList.size());
+  std::vector<int> array_exps_int = defInit(node.id, node.ArrayConstExpList);
+  context.array_exps_int = array_exps_int;
 
-  for (std::shared_ptr<AstConstExp>& array_exp : node.ArrayConstExpList) {
-    Value *exp = array_exp->accept(*this);
-    MY_ASSERT(exp);
-    // TODO exp必须为非负整数,在下面处理了
-    array_exps.push_back(exp);
-  }
-  if (array_exps.empty()) {
+  if (array_exps_int.empty()) {
+    set_context_var_init(node);
+    Value *init_value = nullptr;
+    if (context.var_init) {
+      init_value = context.var_init->accept(*this);
+    }
     // 和C语言不同,C语言全局变量初始化不一定为常量,可以是在之前定义的全局变量
     if (context.global) {
-      Constant* init = nullptr;
-      if (node.InitVal) {
-        node.InitVal->accept(*this);
-        MY_ASSERT(context.var_init);
-        Value *pValue = context.var_init->accept(*this);
-        if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
-          init = constant;
-        } else {
-          // TODO error
-          semantic_error() << "global init must be constant.\n";
-        }
-      } else { // node.InitVal
-        init = ConstantZero::get(context.decl_type, module.get());
-      }
+      Constant* init = init_value ? get_global_constant_init(init_value) : ConstantZero::get(context.decl_type, module.get());
       // global int x = x; error
       // local int x = x; ok
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, false, init);
@@ -198,89 +291,26 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
       scope.push(node.id, pInst, Scope::VarType::LocalVar);
       // 应该放在scope.push后面, 比如 int a = a;
       // node.InitVal语义检查
-      if (node.InitVal) {
-        node.InitVal->accept(*this);
-        MY_ASSERT(context.var_init);
-        Value *pValue = context.var_init->accept(*this);
-        builder->create_store(pValue, pInst);
+      if (init_value) {
+        builder->create_store(init_value, pInst);
       }
     }
   } else { // array_exps.empty()
-    Type* array_type = context.decl_type;
-    std::vector<int> array_exps_int = to_indices(array_exps);
-    int count = 1;
-    for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
-      count *= *it;
-      array_type = ArrayType::get(array_type, *it);
-    }
-    context.curr_array_type = array_type;
-    context.max_column = array_exps_int.back();
-
-    if (node.InitVal) {
-      node.InitVal->accept(*this);
-      // 补齐缺省的元素，已添加的肯定是合法的初始化方式
-      while (context.array_init.size() < count) {
-        context.array_init.push_back(nullptr);
-      }
-      MY_ASSERT(count == context.array_init.size());
-    }
+    Type* array_type = set_context_array_type(array_exps_int);
+    set_contest_array_init_value(node, array_exps_int);
 
     if (context.global) {
-      // cpp全局变量可以用已定义的全局变量初始化, C不行
-      // int y[3] = {x}; error: initializer element is not a compile-time constant
-      Constant* init = nullptr;
-
-      if (!context.array_init.empty()) {
-        std::queue<Constant*> queue;
-        for (const auto &item: context.array_init) {
-          Value *pValue;
-          if (item == nullptr) {
-            pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
-                                                  : static_cast<Value*>(CONST_FP(0));
-          } else {
-            pValue = item->accept(*this);
-          }
-          if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
-            queue.push(constant);
-          } else {
-            semantic_error() << "global init must be constant.\n";
-          }
-        }
-        Type* curr_type = context.decl_type == INT32_T ? INT32_T : FLOAT_T;
-        int denominator = 1;
-        for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
-          int bound = *it;
-          denominator *= bound;
-          curr_type = ArrayType::get(curr_type, bound);
-          MY_ASSERT(count % denominator == 0);
-          int step = count / denominator;
-          for (int i = 0; i < step; ++i) {
-            std::vector<Constant*> constants;
-            constants.reserve(bound);
-            for (int j = 0; j < bound; ++j) {
-              constants.push_back(queue.front());
-              queue.pop();
-            }
-            Constant *pArray = ConstantArray::get(static_cast<ArrayType *>(curr_type), constants);
-            queue.push(pArray);
-          }
-        }
-        MY_ASSERT(queue.size() == 1);
-        init = queue.front();
-      } else { // node.InitVal
-        init = ConstantZero::get(array_type, module.get());
-      }
+      Constant* init = get_global_array_constant_init(array_type, array_exps_int);
       GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, false, init);
       scope.push(node.id, pVariable, Scope::VarType::GlobalArray);
     } else { // context.global
       AllocaInst *pInst = builder->create_alloca(array_type);
       scope.push(node.id, pInst, Scope::VarType::LocalArray); // 应该放在node.InitVal前面, 比如 int a = a;
-      // TODO array_exps有用到吗, 可以用来检验数组访问是否合法
-      // scope.push_array_exps(node.id, array_exps_int);
+      // TODO array_exps有用到吗, 可以用来检验数组访问是否合法, 没用, 直接用array_exps_int就行了
       if (!context.array_init.empty()) {
         std::vector<Value*> pos{pInst};
         int curr = 0;
-        initializeArray(0, curr, array_exps, pos, array_exps_int);
+        initializeArray(0, curr, pos, array_exps_int);
       }
       // TODO 怎么给所有元素初始化为 0?
     }
@@ -313,13 +343,13 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
   if (context.curr_array_type &&
           (context.curr_array_type->get_array_element_type() == INT32_T ||
            context.curr_array_type->get_array_element_type() == FLOAT_T)) {
-    MY_ASSERT(node.InitValList.size() <= context.max_column);
+    MY_ASSERT(node.InitValList.size() <= context.array_exps_int.back());
     std::vector<std::shared_ptr<AstExp>> tmp_init;
     for (const auto& initVal : node.InitValList) {
       MY_ASSERT(initVal->Exp != nullptr);
       tmp_init.push_back(initVal->Exp);
     }
-    while (tmp_init.size() < context.max_column) {
+    while (tmp_init.size() < context.array_exps_int.back()) {
       tmp_init.push_back(nullptr);
     }
     context.array_init.insert(context.array_init.end(), tmp_init.begin(), tmp_init.end());
@@ -331,7 +361,7 @@ Value* CminusfBuilder::visit(AstInitVal &node) {
   for (int i = 0; i < node.InitValList.size(); i++) {
     std::shared_ptr<AstInitVal> initVal = node.InitValList[i];
     if (initVal->Exp == nullptr) { // {...}
-      MY_ASSERT(column % context.max_column == 0); // TODO report error
+      MY_ASSERT(column % context.array_exps_int.back() == 0); // TODO report error
       column = 0; // ?
       context.curr_array_type = context.curr_array_type->get_array_element_type();
       initVal->accept(*this);
@@ -457,6 +487,7 @@ Value* CminusfBuilder::visit(AstContinueStmt &node) {
   return nullptr;
 }
 
+// TODO const
 Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
   Scope::ValueWithType valueWithType = scope.find(lval.id);
   Value *pValue = valueWithType.val;
