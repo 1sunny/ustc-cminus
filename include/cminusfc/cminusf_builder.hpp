@@ -32,6 +32,10 @@ class Scope {
         GlobalArray,
         LocalVar,
         LocalArray,
+        ConstGlobalVar,
+        ConstGlobalArray,
+        ConstLocalVar,
+        ConstLocalArray,
         ParamVar,
         ParamArray,
         Function
@@ -218,7 +222,9 @@ class CminusfBuilder : public syntax_tree_visitor {
         std::vector<int> array_exps_int;
         bool global;
         std::shared_ptr<AstExp> var_init;
+        std::shared_ptr<AstConstExp> const_init;
         std::vector<std::shared_ptr<AstExp>> array_init;
+        std::vector<std::shared_ptr<AstConstExp>> const_array_init;
         struct LogicBB {
             BasicBlock* trueBB{};
             BasicBlock* falseBB{};
@@ -283,19 +289,23 @@ class CminusfBuilder : public syntax_tree_visitor {
     std::vector<int> to_indices(std::vector<Value *> &values);
 
     void initializeArray(int u, int& curr, std::vector<Value *> &pos,
-                         std::vector<int> array_exps_int);
+                         std::vector<int> array_exps_int, bool const_array);
 
     ConstantInt *to_const_index(Value *value);
 
     std::vector<int> defInit(const std::string &id, std::vector<std::shared_ptr<AstConstExp>> &ArrayConstExpList);
 
-    Constant *get_global_array_constant_init(Type *array_type, std::vector<int> array_exps_int);
+    Constant *get_global_array_constant_init(Type *array_type, std::vector<int> array_exps_int, bool const_array);
 
-    void set_contest_array_init_value(AstVarDef &node, std::vector<int> array_exps_int);
+    void set_context_array_init_value(AstVarDef &node, std::vector<int> array_exps_int);
 
     Constant *get_global_constant_init(Value *init_value);
 
     void set_context_var_init(AstVarDef &node);
 
     Type *set_context_array_type(std::vector<int> array_exps_int);
+
+    void set_context_const_init(AstConstDef &node);
+
+    void set_context_const_array_init_value(AstConstDef &node, std::vector<int> array_exps_int);
 };

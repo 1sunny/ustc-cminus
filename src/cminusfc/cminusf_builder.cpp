@@ -88,18 +88,109 @@ Value* CminusfBuilder::visit(AstCompUnit &node) {
 
 // ConstDecl → 'const' BType ConstDef { ',' ConstDef } ';'
 Value* CminusfBuilder::visit(AstConstDecl &node) {
-  MY_ASSERT(false);
+  BType bType = node.type;
+  Type* type;
+  if (bType == TYPE_INT) {
+    type = INT32_T;
+  } else if (bType == TYPE_FLOAT) {
+    type = FLOAT_T;
+  } else {
+    MY_ASSERT(false);
+  }
+
+  context.decl_type = type;
+
+  for (const std::shared_ptr<AstConstDef>& varDef : node.ConstDefList) {
+    varDef->accept(*this);
+  }
+  return nullptr;
 }
 
+// TODO 语义里const必须初始化: C中可以不初始化,按照C的
+// const int x = 3;
+// int* px = &x; Cannot initialize a variable of type 'int *' with an rvalue of type 'const int *'
 // ConstDef → Ident { '[' ConstExp ']' } '=' ConstInitVal
 Value* CminusfBuilder::visit(AstConstDef &node) {
-  MY_ASSERT(false);
+  std::vector<int> array_exps_int = defInit(node.id, node.ArrayConstExpList);
+  context.array_exps_int = array_exps_int;
 
+  if (array_exps_int.empty()) {
+    set_context_const_init(node);
+    Value *init_value = nullptr;
+    if (context.const_init) {
+      init_value = context.const_init->accept(*this);
+    }
+
+    if (context.global) {
+      Constant* init = get_global_constant_init(init_value);
+      GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, true, init);
+      scope.push(node.id, init, Scope::VarType::ConstGlobalVar);
+    } else { // context.global
+      AllocaInst *pInst = builder->create_alloca(context.decl_type);
+      if (init_value) {
+        builder->create_store(init_value, pInst);
+      }
+      scope.push(node.id, init_value, Scope::VarType::ConstLocalVar);
+    }
+  } else { // array_exps.empty()
+    Type* array_type = set_context_array_type(array_exps_int);
+    set_context_const_array_init_value(node, array_exps_int);
+
+    if (context.global) {
+      Constant* init = get_global_array_constant_init(array_type, array_exps_int, true);
+      GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, true, init);
+      scope.push(node.id, pVariable, Scope::VarType::ConstGlobalArray);
+    } else { // context.global
+      AllocaInst *pInst = builder->create_alloca(array_type);
+      scope.push(node.id, pInst, Scope::VarType::ConstLocalArray);
+      if (not context.const_array_init.empty()) {
+        std::vector<Value*> pos{pInst};
+        int curr = 0;
+        initializeArray(0, curr, pos, array_exps_int, true);
+      }
+    }
+  }
+  return nullptr;
 }
 
 Value* CminusfBuilder::visit(AstConstInitVal &node) {
-  MY_ASSERT(false);
+  if (context.curr_array_type == nullptr) {
+    MY_ASSERT(node.ConstInitValList.empty());
+    context.const_init = node.ConstExp;
+    return nullptr;
+  }
+  if (context.curr_array_type &&
+      (context.curr_array_type->get_array_element_type() == INT32_T ||
+       context.curr_array_type->get_array_element_type() == FLOAT_T)) {
+    MY_ASSERT(node.ConstInitValList.size() <= context.array_exps_int.back());
+    std::vector<std::shared_ptr<AstConstExp>> tmp_init;
+    for (const auto& initVal : node.ConstInitValList) {
+      MY_ASSERT(initVal->ConstExp != nullptr);
+      tmp_init.push_back(initVal->ConstExp);
+    }
+    while (tmp_init.size() < context.array_exps_int.back()) {
+      tmp_init.push_back(nullptr);
+    }
+    context.const_array_init.insert(context.const_array_init.end(), tmp_init.begin(), tmp_init.end());
+    return nullptr;
+  }
+  Type *saved_array_type = context.curr_array_type;
+  int column = 0;
 
+  for (int i = 0; i < node.ConstInitValList.size(); i++) {
+    std::shared_ptr<AstConstInitVal> initVal = node.ConstInitValList[i];
+    if (initVal->ConstExp == nullptr) { // {...}
+      MY_ASSERT(column % context.array_exps_int.back() == 0); // TODO report error
+      column = 0; // ?
+      context.curr_array_type = context.curr_array_type->get_array_element_type();
+      initVal->accept(*this);
+      context.curr_array_type = saved_array_type;
+    } else {
+      context.const_array_init.push_back(initVal->ConstExp);
+      column++;
+    }
+  }
+  return nullptr;
 }
 
 Value* CminusfBuilder::visit(AstVarDecl &node) {
@@ -124,18 +215,42 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
 }
 
 void CminusfBuilder::initializeArray(int u, int& curr,
-                                     std::vector<Value*>& pos, std::vector<int> array_exps_int) {
+                                     std::vector<Value*>& pos, std::vector<int> array_exps_int, bool const_array) {
     if (u == array_exps_int.size()) {
       // TODO context.array_init[curr++] = nullptr
       Value* pValue;
-      if (context.array_init[curr] == nullptr) {
-        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
-                                              : static_cast<Value*>(CONST_FP(0));
-        curr++;
+      if (const_array) {
+        if (context.const_array_init[curr] == nullptr) {
+          pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                                : static_cast<Value*>(CONST_FP(0));
+          curr++;
+        } else {
+          pValue = context.const_array_init[curr++]->accept(*this);
+        }
+        // TODO 判断是否是常量
+        if (auto constant = dynamic_cast<Constant*>(pValue);
+            not (constant && (constant->get_type()->is_float_type() || constant->get_type()->is_integer_type()))){
+              semantic_error() << "global init must be constant.\n";
+        }
       } else {
-        pValue = context.array_init[curr++]->accept(*this);
+        if (context.array_init[curr] == nullptr) {
+          pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                                : static_cast<Value*>(CONST_FP(0));
+          curr++;
+        } else {
+          pValue = context.array_init[curr++]->accept(*this);
+        }
       }
-      LOG_DEBUG << pos.back()->get_type()->print();
+      // TODO 判断类型是否匹配,clang是运行数组初始化时进行float与int间的隐式转换
+      MY_ASSERT(context.decl_type == pos.back()->get_type()->get_pointer_element_type());
+      // TODO 很多地方有这种代码,考虑用函数
+      if (context.decl_type->is_float_type()) {
+        pValue = to_float_type(pValue);
+      } else if (context.decl_type->is_integer_type()) {
+        pValue = to_int32_type(pValue);
+      } else {
+        MY_ASSERT(false);
+      }
       builder->create_store(pValue, pos.back());
       return;
     }
@@ -144,7 +259,7 @@ void CminusfBuilder::initializeArray(int u, int& curr,
       if (i != 0) {
         pos.back() = builder->create_gep(pos.back(), {CONST_INT(1)});
       }
-      initializeArray(u + 1, curr, pos, array_exps_int);
+      initializeArray(u + 1, curr, pos, array_exps_int, const_array);
     }
     pos.pop_back();
 }
@@ -152,7 +267,9 @@ void CminusfBuilder::initializeArray(int u, int& curr,
 std::vector<int> CminusfBuilder::defInit(const std::string& id, std::vector<std::shared_ptr<AstConstExp>>& ArrayConstExpList) {
   LOG_DEBUG << id;
   context.var_init = nullptr;
+  context.const_init = nullptr;
   context.array_init.clear();
+  context.const_array_init.clear();
   context.curr_array_type = nullptr;
   context.curr_id = id;
   std::vector<Value *> array_exps;
@@ -174,14 +291,23 @@ void CminusfBuilder::set_context_var_init(AstVarDef &node) {
   }
 }
 
+// Cpp中const必须要显式初始化, C中不需要
+void CminusfBuilder::set_context_const_init(AstConstDef &node) {
+  if (node.ConstInitVal) {
+    node.ConstInitVal->accept(*this);
+    MY_ASSERT(context.const_init);
+  }
+}
+
 Constant* CminusfBuilder::get_global_constant_init(Value *init_value) {
   Constant* init = nullptr;
   if (init_value) {
-    if (auto* constant = dynamic_cast<Constant*>(init_value); constant) {
+    if (auto* constant = dynamic_cast<Constant*>(init_value);
+        constant && (constant->get_type()->is_float_type() || constant->get_type()->is_integer_type())) {
       init = constant;
     } else {
       // TODO error
-      semantic_error() << "global init must be constant.\n";
+      semantic_error() << "global init must be constant or wrong initialization expression.\n";
     }
   } else { // node.InitVal
     init = ConstantZero::get(context.decl_type, module.get());
@@ -198,7 +324,7 @@ Type* CminusfBuilder::set_context_array_type(std::vector<int> array_exps_int) {
   return array_type;
 }
 
-void CminusfBuilder::set_contest_array_init_value(AstVarDef &node, std::vector<int> array_exps_int) {
+void CminusfBuilder::set_context_array_init_value(AstVarDef &node, std::vector<int> array_exps_int) {
   if (node.InitVal) {
     node.InitVal->accept(*this);
     int count = 1;
@@ -213,13 +339,33 @@ void CminusfBuilder::set_contest_array_init_value(AstVarDef &node, std::vector<i
   }
 }
 
-Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::vector<int> array_exps_int) {
+// 全局未初始化时默认初始化为0, local未初始化随机值
+void CminusfBuilder::set_context_const_array_init_value(AstConstDef &node, std::vector<int> array_exps_int) {
+  if (node.ConstInitVal) {
+    node.ConstInitVal->accept(*this);
+    int count = 1;
+    for (int bound: array_exps_int) {
+      count *= bound;
+    }
+    // 补齐缺省的元素，已添加的肯定是合法的初始化方式
+    while (context.const_array_init.size() < count) {
+      context.const_array_init.push_back(nullptr);
+    }
+    MY_ASSERT(count == context.const_array_init.size());
+  }
+}
+
+// 语义里要求const需要显式初始化,但C中可以不需要
+Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::vector<int> array_exps_int, bool const_array) {
   // cpp全局变量可以用已定义的全局变量初始化, C不行
   // int y[3] = {x}; error: initializer element is not a compile-time constant
   Constant* init = nullptr;
 
-  if (!context.array_init.empty()) {
-    std::queue<Constant*> queue;
+  std::queue<Constant*> queue;
+  int total_elem;
+  // TODO const全局数组和全局数组, C语言全局初始化必须是常量
+  if (not const_array and not context.array_init.empty()) {
+    total_elem = context.array_init.size();
     for (const auto &item: context.array_init) {
       Value *pValue;
       if (item == nullptr) {
@@ -234,14 +380,32 @@ Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::
         semantic_error() << "global init must be constant.\n";
       }
     }
+  } else if (const_array and not context.const_array_init.empty()) {
+    total_elem = context.const_array_init.size();
+    for (const auto &item: context.const_array_init) {
+      Value *pValue;
+      if (item == nullptr) {
+        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                              : static_cast<Value*>(CONST_FP(0));
+      } else {
+        pValue = item->accept(*this);
+      }
+      if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
+        queue.push(constant);
+      } else {
+        semantic_error() << "global init must be constant.\n";
+      }
+    }
+  }
+  if (not queue.empty()) {
     Type* curr_type = context.decl_type == INT32_T ? INT32_T : FLOAT_T;
     int denominator = 1;
     for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
       int bound = *it;
       denominator *= bound;
       curr_type = ArrayType::get(curr_type, bound);
-      MY_ASSERT(context.array_init.size() % denominator == 0);
-      int step = context.array_init.size() / denominator;
+      MY_ASSERT(total_elem % denominator == 0);
+      int step = total_elem / denominator;
       for (int i = 0; i < step; ++i) {
         std::vector<Constant*> constants;
         constants.reserve(bound);
@@ -279,9 +443,9 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
     if (context.var_init) {
       init_value = context.var_init->accept(*this);
     }
-    // 和C语言不同,C语言全局变量初始化不一定为常量,可以是在之前定义的全局变量
+    // 和C不同,Cpp全局变量初始化不一定为常量,可以是在之前定义的全局变量
     if (context.global) {
-      Constant* init = init_value ? get_global_constant_init(init_value) : ConstantZero::get(context.decl_type, module.get());
+      Constant* init = get_global_constant_init(init_value); // 可以处理init_value = nullptr的情况
       // global int x = x; error
       // local int x = x; ok
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, false, init);
@@ -297,10 +461,10 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
     }
   } else { // array_exps.empty()
     Type* array_type = set_context_array_type(array_exps_int);
-    set_contest_array_init_value(node, array_exps_int);
+    set_context_array_init_value(node, array_exps_int);
 
     if (context.global) {
-      Constant* init = get_global_array_constant_init(array_type, array_exps_int);
+      Constant* init = get_global_array_constant_init(array_type, array_exps_int, false);
       GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, false, init);
       scope.push(node.id, pVariable, Scope::VarType::GlobalArray);
     } else { // context.global
@@ -310,7 +474,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
       if (!context.array_init.empty()) {
         std::vector<Value*> pos{pInst};
         int curr = 0;
-        initializeArray(0, curr, pos, array_exps_int);
+        initializeArray(0, curr, pos, array_exps_int, false);
       }
       // TODO 怎么给所有元素初始化为 0?
     }
@@ -332,6 +496,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
 //         $$->Exp = nullptr;
 //         $$->InitValList.swap($2->list);
 //     };
+// C中:
 // int b[2][2]={1, {1, 1}}; wrong
 // int b[2][2]={1, {1}}; yes
 Value* CminusfBuilder::visit(AstInitVal &node) {
@@ -392,7 +557,6 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   }
   // TODO void时FuncFParamList有吗? 这里要改,目前还没有void,需要添加
   for (std::shared_ptr<AstFuncFParam> &param: node.FuncFParamList) {
-    // TODO: Please accomplish param_types.
     Type *param_type;
     if (param->type == TYPE_INT) {
       param_type = INT32_T;
@@ -429,7 +593,6 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
     args.push_back(&arg);
   }
   for (int i = 0; i < node.FuncFParamList.size(); ++i) {
-    // TODO: You need to deal with params and store them in the scope.
     // 要区分数组!
     AllocaInst *pAlloca = builder->create_alloca(param_types[i]);
     builder->create_store(args[i], pAlloca);
@@ -460,7 +623,6 @@ Value* CminusfBuilder::visit(AstFuncFParam &node) {
 }
 
 Value* CminusfBuilder::visit(AstBlock &node) {
-// TODO: This function is not complete.
   // You may need to add some code here
   // to deal with complex statements.
   scope.enter();
@@ -487,77 +649,10 @@ Value* CminusfBuilder::visit(AstContinueStmt &node) {
   return nullptr;
 }
 
-// TODO const
-Value* CminusfBuilder::get_lval_location(const AstLVal &lval) {
-  Scope::ValueWithType valueWithType = scope.find(lval.id);
-  Value *pValue = valueWithType.val;
-  Scope::VarType type = valueWithType.type;
-  LOG_DEBUG << "type: " << pValue->get_type()->print() << ", name: " << lval.id;
-  // 普通变量是地址
-  // 需要考虑全局变量, 全局变量直接是地址
-  // 形参数组一般是把alloc的用来存数组地址的地址存在scope中,后面每次访问也会先load出来数组的地址
-  // 直接定义的数组是直接alloc出存数组的地址,和全局变量一样
-  // 用一个flag来表示scope里面存的到底是地址的地址还是地址
-  Value *result = pValue;
-  if (type == Scope::VarType::ParamArray) {
-    result = builder->create_load(pValue);
-  }
-  if (lval.ArrayExpList.empty()) { // 这个也可能是传的数组名
-  } else {
-    // param array 和 local定义的array访问区别:
-    // define dso_local i32 @test4([6 x i32]* %0) #0 {
-    //   %2 = alloca i32, align 4
-    //   %3 = alloca [6 x i32]*, align 8
-    //   %4 = alloca [3 x [3 x i32]], align 16
-    //   store [6 x i32]* %0, [6 x i32]** %3, align 8
-    //   %5 = bitcast [3 x [3 x i32]]* %4 to i8*
-    //   call void @llvm.memset.p0i8.i64(i8* align 16 %5, i8 0, i64 36, i1 false)
-    //   %6 = bitcast i8* %5 to [3 x [3 x i32]]*
-    //   %7 = getelementptr inbounds [3 x [3 x i32]], [3 x [3 x i32]]* %6, i32 0, i32 0
-    //   %8 = getelementptr inbounds [3 x i32], [3 x i32]* %7, i32 0, i32 0
-    //   store i32 3, i32* %8, align 16
-    //   %9 = getelementptr inbounds [3 x [3 x i32]], [3 x [3 x i32]]* %4, i64 0, i64 0
-    //   %10 = getelementptr inbounds [3 x i32], [3 x i32]* %9, i64 0, i64 1
-    //   store i32 2, i32* %10, align 4
-    //   %11 = load [6 x i32]*, [6 x i32]** %3, align 8
-    //   %12 = getelementptr inbounds [6 x i32], [6 x i32]* %11, i64 3
-    //   %13 = getelementptr inbounds [6 x i32], [6 x i32]* %12, i64 0, i64 4
-    //   store i32 5, i32* %13, align 4
-    //   %14 = load i32, i32* %2, align 4
-    //   ret i32 %14
-    // }
-    for (int i = 0; i < lval.ArrayExpList.size(); i++) {
-      std::shared_ptr<AstExp> exp = lval.ArrayExpList[i];
-      context.load_lval.push_back(true);
-      Value *offset = exp->accept(*this);
-      context.load_lval.pop_back();
-      MY_ASSERT(offset->get_type()->is_float_type() || offset->get_type()->is_integer_type());
-      // make sure offset is int type
-      offset = to_int32_type(offset);
-
-      if (auto constInt = to_const<ConstantInt>(offset); constInt) {
-        if (constInt->get_value() < 0) {
-          semantic_error() << "negative index exception.\n";
-        }
-      }
-      // fix bug: {offset} -> {CONST_INT(0), offset}
-      if (type == Scope::VarType::ParamArray && i == 0) {
-        result = builder->create_gep(result, {offset});
-      } else {
-        result = builder->create_gep(result, {CONST_INT(0), offset});
-      }
-      // LOG_DEBUG << pValue->get_type()->print();
-    }
-  }
-  context.from_param_array = (type == Scope::VarType::ParamArray);
-  return result;
-}
-
+// TODO const不能assign
 Value* CminusfBuilder::visit(AstAssignStmt &node) {
   MY_ASSERT(node.Exp && node.LVal);
-  context.load_lval.push_back(true);
   Value *value = node.Exp->accept(*this);
-  context.load_lval.pop_back();
 
   context.load_lval.push_back(false);
   Value *loc = node.LVal->accept(*this);
@@ -662,7 +757,6 @@ Value* CminusfBuilder::visit(AstReturnStmt &node) {
     if (return_type == VOID_T) {
       semantic_error() << "function '" << context.func->get_name() << "' return type mismatch.\n";
     }
-    // TODO: The given code is incomplete.
     // You need to solve other return cases (e.g. return an integer).
     Value *value = node.Exp->accept(*this);
     MY_ASSERT(return_type->is_float_type() || return_type->is_integer_type());
@@ -714,10 +808,86 @@ Value* CminusfBuilder::visit(AstCallee &node) {
   return ret;
 }
 
+// LVal既可以在右边又可以在左边
+// 左边不能load, 右边需要看情况决定是否load, 作为数组传参就不能load
 Value* CminusfBuilder::visit(AstLVal &node) {
-  Value *loc = get_lval_location(node);
+  Scope::ValueWithType valueWithType = scope.find(node.id);
+  Value *pValue = valueWithType.val;
+  Scope::VarType type = valueWithType.type;
+  LOG_DEBUG << "type: " << pValue->get_type()->print() << ", name: " << node.id;
+  if (type == Scope::VarType::ConstGlobalVar || type == Scope::VarType::ConstLocalVar) {
+    if (pValue == nullptr) {
+      MY_ASSERT(false); // TODO
+    }
+    if (auto constInt = dynamic_cast<ConstantInt*>(pValue); constInt) {
+      return CONST_INT(constInt->get_value());
+    } else if (auto constFp = dynamic_cast<ConstantInt*>(pValue); constFp) {
+      return CONST_FP(constFp->get_value());
+    } else {
+      MY_ASSERT(false);
+    }
+    return pValue;
+  }
+  // 普通变量是地址
+  // 需要考虑全局变量, 全局变量直接是地址
+  // 形参数组一般是把alloc的用来存数组地址的地址存在scope中,后面每次访问也会先load出来数组的地址
+  // 直接定义的数组是直接alloc出存数组的地址,和全局变量一样
+  // 用一个flag来表示scope里面存的到底是地址的地址还是地址
+  Value *loc = pValue;
+  if (type == Scope::VarType::ParamArray) {
+    loc = builder->create_load(pValue);
+  }
+  if (node.ArrayExpList.empty()) { // 这个也可能是传的数组名
+  } else {
+    // param array 和 local定义的array访问区别:
+    // define dso_local i32 @test4([6 x i32]* %0) #0 {
+    //   %2 = alloca i32, align 4
+    //   %3 = alloca [6 x i32]*, align 8
+    //   %4 = alloca [3 x [3 x i32]], align 16
+    //   store [6 x i32]* %0, [6 x i32]** %3, align 8
+    //   %5 = bitcast [3 x [3 x i32]]* %4 to i8*
+    //   call void @llvm.memset.p0i8.i64(i8* align 16 %5, i8 0, i64 36, i1 false)
+    //   %6 = bitcast i8* %5 to [3 x [3 x i32]]*
+    //   %7 = getelementptr inbounds [3 x [3 x i32]], [3 x [3 x i32]]* %6, i32 0, i32 0
+    //   %8 = getelementptr inbounds [3 x i32], [3 x i32]* %7, i32 0, i32 0
+    //   store i32 3, i32* %8, align 16
+    //   %9 = getelementptr inbounds [3 x [3 x i32]], [3 x [3 x i32]]* %4, i64 0, i64 0
+    //   %10 = getelementptr inbounds [3 x i32], [3 x i32]* %9, i64 0, i64 1
+    //   store i32 2, i32* %10, align 4
+    //   %11 = load [6 x i32]*, [6 x i32]** %3, align 8
+    //   %12 = getelementptr inbounds [6 x i32], [6 x i32]* %11, i64 3
+    //   %13 = getelementptr inbounds [6 x i32], [6 x i32]* %12, i64 0, i64 4
+    //   store i32 5, i32* %13, align 4
+    //   %14 = load i32, i32* %2, align 4
+    //   ret i32 %14
+    // }
+    for (int i = 0; i < node.ArrayExpList.size(); i++) {
+      std::shared_ptr<AstExp> exp = node.ArrayExpList[i];
+      context.load_lval.push_back(true);
+      Value *offset = exp->accept(*this);
+      context.load_lval.pop_back();
+      MY_ASSERT(offset->get_type()->is_float_type() || offset->get_type()->is_integer_type());
+      // make sure offset is int type
+      offset = to_int32_type(offset);
+
+      if (auto constInt = to_const<ConstantInt>(offset); constInt) {
+        if (constInt->get_value() < 0) {
+          semantic_error() << "negative index exception.\n";
+        }
+      }
+      // fix bug: {offset} -> {CONST_INT(0), offset}
+      if (type == Scope::VarType::ParamArray && i == 0) {
+        loc = builder->create_gep(loc, {offset});
+      } else {
+        loc = builder->create_gep(loc, {CONST_INT(0), offset});
+      }
+      // LOG_DEBUG << pValue->get_type()->print();
+    }
+  }
+  context.from_param_array = (type == Scope::VarType::ParamArray);
   // 什么时候create_load呢? Assign左边的lval不应该,但右边的exp就应该, 函数传参时普通变量应该load,数组传参不应该load
   // const变量应该直接返回第一次创建的变量,不要load,
+  MY_ASSERT(loc->get_type()->is_pointer_type());
   return context.load_lval.back() ? builder->create_load(loc) : loc;
 }
 
