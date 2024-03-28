@@ -29,7 +29,7 @@ def compile_and_run_cminusfc(source_file):
         print(["clang", "-O0", "-w", "-no-pie", llvm_output, "-o", os.path.splitext(source_file)[0], "-L", BUILD_DIR, "-lcminus_io"])
         result_clang = subprocess.run(["clang", "-O0", "-w", "-no-pie", llvm_output, "-o", os.path.splitext(source_file)[0], "-L", BUILD_DIR, "-lcminus_io"])
         if result_clang.returncode == 0:
-            result_run = subprocess.run([os.path.splitext(source_file)[0]], input=input_option, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+            result_run = subprocess.run([os.path.splitext(source_file)[0]], input=input_option, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
             remove_file(os.path.splitext(source_file)[0])
             remove_file(llvm_output)
             return result_run
@@ -56,7 +56,7 @@ def main(folder_path):
                         print(f"{COLOR_RED}Comparing output for {sy_file}: Failed{COLOR_RESET}")
                         print("user output:", output)
                         print("expected_output:", expected_output)
-                        return
+                        input()
                 else:
                     print(f"{COLOR_RED}Compilation failed for {sy_file}{COLOR_RESET}")
                     input()

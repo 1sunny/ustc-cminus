@@ -154,7 +154,13 @@ class CminusfBuilder : public syntax_tree_visitor {
         auto *putfarray_type = FunctionType::get(TyVoid, {TyInt32, TyFloatPtr});
         auto *putfarray_fun = Function::create(putfarray_type, "putfarray", module.get());
 
-        scope.enter();
+        auto *starttime_type = FunctionType::get(TyVoid, {});
+        auto *starttime_fun = Function::create(starttime_type, "_sysy_starttime", module.get());
+
+        auto *stoptime_type = FunctionType::get(TyVoid, {});
+        auto *stoptime_fun = Function::create(stoptime_type, "_sysy_stoptime", module.get());
+
+      scope.enter();
         scope.push("input", input_fun, Scope::VarType::Function);
         scope.push("output", output_fun, Scope::VarType::Function);
         scope.push("outputFloat", output_float_fun, Scope::VarType::Function);
@@ -169,6 +175,8 @@ class CminusfBuilder : public syntax_tree_visitor {
         scope.push("putarray", putarray_fun, Scope::VarType::Function);
         scope.push("putfloat", putfloat_fun, Scope::VarType::Function);
         scope.push("putfarray", putfarray_fun, Scope::VarType::Function);
+        scope.push("starttime", starttime_fun, Scope::VarType::Function);
+        scope.push("stoptime", stoptime_fun, Scope::VarType::Function);
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
