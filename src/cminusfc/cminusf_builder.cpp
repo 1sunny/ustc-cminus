@@ -116,20 +116,31 @@ Value* CminusfBuilder::visit(AstConstDef &node) {
 
   if (array_exps_int.empty()) {
     set_context_const_init(node);
-    Value *init_value = nullptr;
-    if (context.const_init) {
-      init_value = context.const_init->accept(*this);
-    }
+    MY_ASSERT(context.const_init);
+    Value *init_value = context.const_init->accept(*this);
+    MY_ASSERT(init_value);
 
     if (context.global) {
       Constant* init = get_global_constant_init(init_value);
+      MY_ASSERT(init);
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, true, init);
       scope.push(node.id, init, Scope::VarType::ConstGlobalVar);
     } else { // context.global
+      BasicBlock *entry_block = context.func->get_entry_block();
+      Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
+      if(terminator != nullptr)
+        entry_block->get_instructions().pop_back();
+
+      BasicBlock *curr_block = builder->get_insert_block();
+      builder->set_insert_point(entry_block);
       AllocaInst *pInst = builder->create_alloca(context.decl_type);
-      if (init_value) {
-        builder->create_store(init_value, pInst);
-      }
+
+      if(terminator != nullptr)
+        entry_block->add_instruction(terminator);
+
+      builder->set_insert_point(curr_block);
+
+      builder->create_store(init_value, pInst);
       scope.push(node.id, init_value, Scope::VarType::ConstLocalVar);
     }
   } else { // array_exps.empty()
@@ -138,16 +149,29 @@ Value* CminusfBuilder::visit(AstConstDef &node) {
 
     if (context.global) {
       Constant* init = get_global_array_constant_init(array_type, array_exps_int, true);
+      MY_ASSERT(init);
       GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, true, init);
       scope.push(node.id, pVariable, Scope::VarType::ConstGlobalArray);
     } else { // context.global
+      BasicBlock *entry_block = context.func->get_entry_block();
+      Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
+      if(terminator != nullptr)
+        entry_block->get_instructions().pop_back();
+
+      BasicBlock *curr_block = builder->get_insert_block();
+      builder->set_insert_point(entry_block);
       AllocaInst *pInst = builder->create_alloca(array_type);
+
+      if(terminator != nullptr)
+        entry_block->add_instruction(terminator);
+
+      builder->set_insert_point(curr_block);
+
       scope.push(node.id, pInst, Scope::VarType::ConstLocalArray);
-      if (not context.const_array_init.empty()) {
-        std::vector<Value*> pos{pInst};
-        int curr = 0;
-        initializeArray(0, curr, pos, array_exps_int, true);
-      }
+      MY_ASSERT(not context.const_array_init.empty());
+      std::vector<Value*> pos{pInst};
+      int curr = 0;
+      initializeArray(0, curr, pos, array_exps_int, true);
     }
   }
   return nullptr;
@@ -296,6 +320,8 @@ void CminusfBuilder::set_context_const_init(AstConstDef &node) {
   if (node.ConstInitVal) {
     node.ConstInitVal->accept(*this);
     MY_ASSERT(context.const_init);
+  } else {
+    semantic_error() << "const object should be initialized\n";
   }
 }
 
@@ -352,6 +378,8 @@ void CminusfBuilder::set_context_const_array_init_value(AstConstDef &node, std::
       context.const_array_init.push_back(nullptr);
     }
     MY_ASSERT(count == context.const_array_init.size());
+  } else {
+    semantic_error() << "const object should be initialized\n";
   }
 }
 
@@ -446,12 +474,26 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
     // 和C不同,Cpp全局变量初始化不一定为常量,可以是在之前定义的全局变量
     if (context.global) {
       Constant* init = get_global_constant_init(init_value); // 可以处理init_value = nullptr的情况
+      MY_ASSERT(init);
       // global int x = x; error
       // local int x = x; ok
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, false, init);
       scope.push(node.id, pGlobal, Scope::VarType::GlobalVar);
     } else { // context.global
+      BasicBlock *entry_block = context.func->get_entry_block();
+      Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
+      if(terminator != nullptr)
+        entry_block->get_instructions().pop_back();
+
+      BasicBlock *curr_block = builder->get_insert_block();
+      builder->set_insert_point(entry_block);
       AllocaInst *pInst = builder->create_alloca(context.decl_type);
+
+      if(terminator != nullptr)
+        entry_block->add_instruction(terminator);
+
+      builder->set_insert_point(curr_block);
+
       scope.push(node.id, pInst, Scope::VarType::LocalVar);
       // 应该放在scope.push后面, 比如 int a = a;
       // node.InitVal语义检查
@@ -465,10 +507,24 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
 
     if (context.global) {
       Constant* init = get_global_array_constant_init(array_type, array_exps_int, false);
+      MY_ASSERT(init);
       GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, false, init);
       scope.push(node.id, pVariable, Scope::VarType::GlobalArray);
     } else { // context.global
+      // BasicBlock *entry_block = context.func->get_entry_block();
+      // Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
+      // if(terminator != nullptr)
+      //   entry_block->get_instructions().pop_back();
+      //
+      // BasicBlock *curr_block = builder->get_insert_block();
+      // builder->set_insert_point(entry_block);
       AllocaInst *pInst = builder->create_alloca(array_type);
+      //
+      // if(terminator != nullptr)
+      //   entry_block->add_instruction(terminator);
+      //
+      // builder->set_insert_point(curr_block);
+
       scope.push(node.id, pInst, Scope::VarType::LocalArray); // 应该放在node.InitVal前面, 比如 int a = a;
       // TODO array_exps有用到吗, 可以用来检验数组访问是否合法, 没用, 直接用array_exps_int就行了
       if (!context.array_init.empty()) {
@@ -813,12 +869,10 @@ Value* CminusfBuilder::visit(AstCallee &node) {
 Value* CminusfBuilder::visit(AstLVal &node) {
   Scope::ValueWithType valueWithType = scope.find(node.id);
   Value *pValue = valueWithType.val;
+  MY_ASSERT(pValue);
   Scope::VarType type = valueWithType.type;
   LOG_DEBUG << "type: " << pValue->get_type()->print() << ", name: " << node.id;
   if (type == Scope::VarType::ConstGlobalVar || type == Scope::VarType::ConstLocalVar) {
-    if (pValue == nullptr) {
-      MY_ASSERT(false); // TODO
-    }
     if (auto constInt = dynamic_cast<ConstantInt*>(pValue); constInt) {
       return CONST_INT(constInt->get_value());
     } else if (auto constFp = dynamic_cast<ConstantInt*>(pValue); constFp) {
