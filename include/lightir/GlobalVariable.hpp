@@ -5,7 +5,7 @@
 
 #include <llvm/ADT/ilist_node.h>
 class Module;
-class GlobalVariable : public User, public llvm::ilist_node<GlobalVariable> {
+class GlobalVariable : public User/*, public llvm::ilist_node<GlobalVariable>*/ {
   private:
     bool is_const_;
     Constant *init_val_;

@@ -18,7 +18,7 @@ class Argument;
 class Type;
 class FunctionType;
 
-class Function : public Value, public llvm::ilist_node<Function> {
+class Function : public Value/*, public llvm::ilist_node<Function> */{
   public:
     Function(const Function &) = delete;
     Function(FunctionType *ty, const std::string &name, Module *parent);
@@ -38,10 +38,10 @@ class Function : public Value, public llvm::ilist_node<Function> {
     Module *get_parent() const;
 
     void remove(BasicBlock *bb);
-    BasicBlock *get_entry_block() { return &*basic_blocks_.begin(); }
+    BasicBlock *get_entry_block() { return *basic_blocks_.begin(); }
 
-    llvm::ilist<BasicBlock> &get_basic_blocks() { return basic_blocks_; }
-    std::list<Argument> &get_args() { return arguments_; }
+    std::list<BasicBlock*> &get_basic_blocks() { return basic_blocks_; }
+    std::list<Argument*> &get_args() { return arguments_; }
 
     bool is_declaration() { return basic_blocks_.empty(); }
 
@@ -49,8 +49,8 @@ class Function : public Value, public llvm::ilist_node<Function> {
     std::string print();
 
   private:
-    llvm::ilist<BasicBlock> basic_blocks_;
-    std::list<Argument> arguments_;
+    std::list<BasicBlock*> basic_blocks_;
+    std::list<Argument*> arguments_;
     Module *parent_;
     unsigned seq_cnt_; // print use
 };

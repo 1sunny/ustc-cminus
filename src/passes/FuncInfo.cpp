@@ -3,7 +3,7 @@
 
 void FuncInfo::run() {
     for (auto &f : m_->get_functions()) {
-        auto func = &f;
+        auto func = f;
         trivial_mark(func);
         if (not is_pure[func])
             worklist.push_back(func);
@@ -39,8 +39,8 @@ void FuncInfo::trivial_mark(Function *func) {
         }
     }
     for (auto &bb : func->get_basic_blocks())
-        for (auto &inst : bb.get_instructions()) {
-            if (is_side_effect_inst(&inst)) {
+        for (auto &inst : bb->get_instructions()) {
+            if (is_side_effect_inst(inst)) {
                 is_pure[func] = false;
                 return;
             }

@@ -11,9 +11,9 @@ void Mem2Reg::run() {
     dominators_->run();
     // 以函数为单元遍历实现 Mem2Reg 算法
     for (auto &f : m_->get_functions()) {
-        if (f.is_declaration())
+        if (f->is_declaration())
             continue;
-        func_ = &f;
+        func_ = f;
         if (func_->get_basic_blocks().size() >= 1) {
             // 对应伪代码中 phi 指令插入的阶段
             generate_phi();

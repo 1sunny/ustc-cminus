@@ -50,17 +50,17 @@ FunctionType *Module::get_function_type(Type *retty,
 }
 
 void Module::add_function(Function *f) { function_list_.push_back(f); }
-llvm::ilist<Function> &Module::get_functions() { return function_list_; }
+std::list<Function*> &Module::get_functions() { return function_list_; }
 void Module::add_global_variable(GlobalVariable *g) {
     global_list_.push_back(g);
 }
-llvm::ilist<GlobalVariable> &Module::get_global_variable() {
+std::list<GlobalVariable*> &Module::get_global_variable() {
     return global_list_;
 }
 
 void Module::set_print_name() {
     for (auto &func : this->get_functions()) {
-        func.set_instr_name();
+        func->set_instr_name();
     }
     return;
 }
@@ -69,11 +69,11 @@ std::string Module::print() {
     set_print_name();
     std::string module_ir;
     for (auto &global_val : this->global_list_) {
-        module_ir += global_val.print();
+        module_ir += global_val->print();
         module_ir += "\n";
     }
     for (auto &func : this->function_list_) {
-        module_ir += func.print();
+        module_ir += func->print();
         module_ir += "\n";
     }
     return module_ir;

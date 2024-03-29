@@ -18,7 +18,7 @@ void BasicBlock::erase_from_parent() { this->get_parent()->remove(this); }
 bool BasicBlock::is_terminated() const {
     if (instr_list_.empty())
         return false;
-    switch (instr_list_.back().get_instr_type()) {
+    switch (instr_list_.back()->get_instr_type()) {
     case Instruction::ret:
     case Instruction::br:
         return true;
@@ -30,7 +30,7 @@ bool BasicBlock::is_terminated() const {
 Instruction *BasicBlock::get_terminator() {
     assert(is_terminated() &&
            "Trying to get terminator from an bb which is not terminated");
-    return &instr_list_.back();
+    return instr_list_.back();
 }
 
 void BasicBlock::add_instruction(Instruction *instr) {
@@ -60,7 +60,7 @@ std::string BasicBlock::print() {
     bb_ir += "\n";
     for (auto &instr : this->get_instructions()) {
         bb_ir += "  ";
-        bb_ir += instr.print();
+        bb_ir += instr->print();
         bb_ir += "\n";
     }
 

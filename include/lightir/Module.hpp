@@ -18,6 +18,8 @@ class Function;
 class Module {
   public:
     Module();
+    // TODO 这里我把 global_list_,function_list_从
+    //  llvm::ilist<Function> -> std::list<Function*> 是不是需要修改析构函数?
     ~Module() = default;
 
     Type *get_void_type();
@@ -36,20 +38,20 @@ class Module {
 
     // 将函数 f 添加到该模块的函数链表上, 在函数被创建的时候会自动调用此方法
     void add_function(Function *f);
-    llvm::ilist<Function> &get_functions();
+    std::list<Function*> &get_functions();
     // 将全局变量 g 添加到该模块的全局变量链表上, 在全局变量被创建的时候会自动调用此方法
     void add_global_variable(GlobalVariable *g);
     // 获取全局变量列表
-    llvm::ilist<GlobalVariable> &get_global_variable();
+    std::list<GlobalVariable*> &get_global_variable();
 
     void set_print_name();
     std::string print();
 
   private:
     // The global variables in the module
-    llvm::ilist<GlobalVariable> global_list_;
+    std::list<GlobalVariable*> global_list_;
     // The functions in the module
-    llvm::ilist<Function> function_list_;
+    std::list<Function*> function_list_;
 
     std::unique_ptr<IntegerType> int1_ty_;
     std::unique_ptr<IntegerType> int32_ty_;

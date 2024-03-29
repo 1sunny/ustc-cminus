@@ -9,7 +9,7 @@
 class BasicBlock;
 class Function;
 
-class Instruction : public User, public llvm::ilist_node<Instruction> {
+class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
   public:
     enum OpID : uint32_t {
         // Terminator Instructions

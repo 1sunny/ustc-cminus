@@ -8,7 +8,7 @@ void DeadCode::run() {
     do {
         changed = false;
         for (auto &F : m_->get_functions()) {
-            auto func = &F;
+            auto func = F;
             mark(func);
             changed |= sweep(func);
         }
@@ -21,10 +21,10 @@ void DeadCode::mark(Function *func) {
     marked.clear();
 
     for (auto &bb : func->get_basic_blocks()) {
-        for (auto &ins : bb.get_instructions()) {
-            if (is_critical(&ins)) {
-                marked[&ins] = true;
-                work_list.push_back(&ins);
+        for (auto &ins : bb->get_instructions()) {
+            if (is_critical(ins)) {
+                marked[ins] = true;
+                work_list.push_back(ins);
             }
         }
     }
@@ -54,13 +54,13 @@ void DeadCode::mark(Instruction *ins) {
 bool DeadCode::sweep(Function *func) {
     std::unordered_set<Instruction *> wait_del{};
     for (auto &bb : func->get_basic_blocks()) {
-        for (auto it = bb.get_instructions().begin();
-             it != bb.get_instructions().end();) {
-            if (marked[&*it]) {
+        for (auto it = bb->get_instructions().begin();
+             it != bb->get_instructions().end();) {
+            if (marked[*it]) {
                 ++it;
                 continue;
             } else {
-                auto tmp = &*it;
+                auto tmp = *it;
                 wait_del.insert(tmp);
                 it++;
             }
@@ -69,7 +69,7 @@ bool DeadCode::sweep(Function *func) {
     for (auto inst : wait_del)
         inst->remove_all_operands();
     for (auto inst : wait_del)
-        inst->get_parent()->get_instructions().erase(inst);
+        inst->get_parent()->erase_instr(inst);
     ins_count += wait_del.size();
     return not wait_del.empty(); // changed
 }

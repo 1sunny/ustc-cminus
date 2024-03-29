@@ -2,11 +2,11 @@
 
 void Dominators::run() {
     for (auto &f1 : m_->get_functions()) {
-        auto f = &f1;
+        auto f = f1;
         if (f->get_basic_blocks().size() == 0)
             continue;
         for (auto &bb1 : f->get_basic_blocks()) {
-            auto bb = &bb1;
+            auto bb = bb1;
             idom_.insert({bb, {}});
             dom_frontier_.insert({bb, {}});
             dom_tree_succ_blocks_.insert({bb, {}});

@@ -8,7 +8,7 @@ Function::Function(FunctionType *ty, const std::string &name, Module *parent)
     parent->add_function(this);
     // build args
     for (unsigned i = 0; i < get_num_of_args(); i++) {
-        arguments_.emplace_back(ty->get_param_type(i), "", this, i);
+        arguments_.emplace_back(new Argument(ty->get_param_type(i), "", this, i));
     }
 }
 Function *Function::create(FunctionType *ty, const std::string &name,
@@ -47,15 +47,15 @@ void Function::add_basic_block(BasicBlock *bb) { basic_blocks_.push_back(bb); }
 void Function::set_instr_name() {
     std::map<Value *, int> seq;
     for (auto &arg : this->get_args()) {
-        if (seq.find(&arg) == seq.end()) {
+        if (seq.find(arg) == seq.end()) {
             auto seq_num = seq.size() + seq_cnt_;
-            if (arg.set_name("arg" + std::to_string(seq_num))) {
-                seq.insert({&arg, seq_num});
+            if (arg->set_name("arg" + std::to_string(seq_num))) {
+                seq.insert({arg, seq_num});
             }
         }
     }
     for (auto &bb1 : basic_blocks_) {
-        auto bb = &bb1;
+        auto bb = bb1;
         if (seq.find(bb) == seq.end()) {
             auto seq_num = seq.size() + seq_cnt_;
             if (bb->set_name("label" + std::to_string(seq_num))) {
@@ -63,10 +63,10 @@ void Function::set_instr_name() {
             }
         }
         for (auto &instr : bb->get_instructions()) {
-            if (!instr.is_void() && seq.find(&instr) == seq.end()) {
+            if (!instr->is_void() && seq.find(instr) == seq.end()) {
                 auto seq_num = seq.size() + seq_cnt_;
-                if (instr.set_name("op" + std::to_string(seq_num))) {
-                    seq.insert({&instr, seq_num});
+                if (instr->set_name("op" + std::to_string(seq_num))) {
+                    seq.insert({instr, seq_num});
                 }
             }
         }
@@ -101,7 +101,7 @@ std::string Function::print() {
         for (auto &arg : get_args()) {
             if (&arg != &*get_args().begin())
                 func_ir += ", ";
-            func_ir += arg.print();
+            func_ir += arg->print();
         }
     }
     func_ir += ")";
@@ -113,7 +113,7 @@ std::string Function::print() {
         func_ir += " {";
         func_ir += "\n";
         for (auto &bb1 : this->get_basic_blocks()) {
-            auto bb = &bb1;
+            auto bb = bb1;
             func_ir += bb->print();
         }
         func_ir += "}";

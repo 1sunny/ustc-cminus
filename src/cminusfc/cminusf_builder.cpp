@@ -646,7 +646,7 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
 
   std::vector<Value *> args;
   for (auto &arg: func->get_args()) {
-    args.push_back(&arg);
+    args.push_back(arg);
   }
   for (int i = 0; i < node.FuncFParamList.size(); ++i) {
     // 要区分数组!
@@ -832,29 +832,30 @@ Value* CminusfBuilder::visit(AstCallee &node) {
   Scope::ValueWithType valueWithType = scope.find(node.id);
   auto* func = dynamic_cast<Function *>(valueWithType.val);
   MY_ASSERT(func);
-  std::list<Argument> &list = func->get_args();
+  std::list<Argument*> &list = func->get_args();
   MY_ASSERT(list.size() == node.ExpList.size());
-  std::list<Argument>::iterator iterator = list.begin();
+  std::list<Argument*>::iterator iterator = list.begin();
   for (int i = 0; i < node.ExpList.size(); i++) {
     std::shared_ptr<AstExp> actual_param = node.ExpList[i];
-    if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
+    Argument *pArgument = *iterator;
+    if (pArgument->get_type()->is_pointer_type()) { // 参数是数组形式
       context.load_lval.push_back(false);
     }
     // TODO 传数组应该传数组名(指针), 类型转换int,float
     Value *pValue = actual_param->accept(*this);
-    if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
+    if (pArgument->get_type()->is_pointer_type()) { // 参数是数组形式
       if (not context.from_param_array) {
         pValue = builder->create_gep(pValue, {CONST_INT(0), CONST_INT(0)});
       }
     } else {
-      MY_ASSERT(iterator->get_type()->is_float_type() || iterator->get_type()->is_integer_type());
-      if (iterator->get_type()->is_float_type()) {
+      MY_ASSERT(pArgument->get_type()->is_float_type() || pArgument->get_type()->is_integer_type());
+      if (pArgument->get_type()->is_float_type()) {
         pValue = to_float_type(pValue);
-      } else if (iterator->get_type()->is_int32_type()) {
+      } else if (pArgument->get_type()->is_int32_type()) {
         pValue = to_int32_type(pValue);
       }
     }
-    if (iterator->get_type()->is_pointer_type()) { // 参数是数组形式
+    if (pArgument->get_type()->is_pointer_type()) { // 参数是数组形式
       context.load_lval.pop_back();
     }
     actual_params.push_back(pValue);

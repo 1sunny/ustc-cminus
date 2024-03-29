@@ -13,7 +13,7 @@ class Function;
 class Instruction;
 class Module;
 
-class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
+class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
   public:
     ~BasicBlock() = default;
     // 创建并返回基本块，参数分别是基本块所属的模块，基本块名字（默认为空），基本块所属的函数
@@ -44,9 +44,13 @@ class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
     // 将指令 instr 添加到该基本块的指令链表首部
     void add_instr_begin(Instruction *instr) { instr_list_.push_front(instr); }
     // 将指令 instr 从该基本块的指令链表中移除，该 API 会同时维护好 instr 的操作数的 use 链表。
-    void erase_instr(Instruction *instr) { instr_list_.erase(instr); }
+    void erase_instr(Instruction *instr) {
+        instr_list_.remove(instr);
+        instr->remove_all_operands();
+    }
 
-    llvm::ilist<Instruction> &get_instructions() { return instr_list_; }
+    // llvm::ilist<Instruction> &get_instructions() { return instr_list_; }
+    std::list<Instruction *> &get_instructions() { return instr_list_; }
     bool empty() const { return instr_list_.empty(); }
     int get_num_of_instr() const { return instr_list_.size(); }
 
@@ -63,6 +67,7 @@ class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
 
     std::list<BasicBlock *> pre_bbs_;
     std::list<BasicBlock *> succ_bbs_;
-    llvm::ilist<Instruction> instr_list_;
+    std::list<Instruction *> instr_list_;
+    // llvm::ilist<Instruction> instr_list_;
     Function *parent_;
 };
