@@ -642,6 +642,15 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   context.func = func;
   auto funBB = BasicBlock::create(module.get(), "entry", func);
   builder->set_insert_point(funBB);
+  if (node.type == TYPE_INT) {
+    context.return_value = builder->create_alloca(INT32_T);
+  } else if (node.type == TYPE_FLOAT) {
+    context.return_value = builder->create_alloca(FLOAT_T);
+  }
+
+  auto retBB = BasicBlock::create(module.get(), "ret", func);
+  context.return_bb = retBB;
+
   scope.enter();
 
   std::vector<Value *> args;
@@ -661,14 +670,14 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   node.Block->accept(*this);
 
   // ?
-  if (not builder->get_insert_block()->is_terminated()) {
-    if (context.func->get_return_type()->is_void_type())
-      builder->create_void_ret();
-    else if (context.func->get_return_type()->is_float_type())
-      builder->create_ret(CONST_FP(0.));
-    else
-      builder->create_ret(CONST_INT(0));
-  }
+  // retBB move to instruction list end?
+  builder->set_insert_point(retBB);
+
+  if (context.func->get_return_type()->is_void_type())
+    builder->create_void_ret();
+  else
+    builder->create_ret(builder->create_load(context.return_value));
+
   scope.exit();
   return nullptr;
 }
@@ -685,6 +694,9 @@ Value* CminusfBuilder::visit(AstBlock &node) {
 
   for (std::shared_ptr<AstBlockItem> &item: node.BlockItemList) {
     item->accept(*this);
+    if(builder->get_insert_block()->is_terminated()) {
+      break;
+    }
   }
 
   scope.exit();
@@ -808,7 +820,7 @@ Value* CminusfBuilder::visit(AstReturnStmt &node) {
     if (return_type != VOID_T) {
       semantic_error() << "function '" << context.func->get_name() << "' return type mismatch.\n";
     }
-    builder->create_void_ret();
+    // builder->create_void_ret();
   } else {
     if (return_type == VOID_T) {
       semantic_error() << "function '" << context.func->get_name() << "' return type mismatch.\n";
@@ -821,8 +833,10 @@ Value* CminusfBuilder::visit(AstReturnStmt &node) {
     } else if (return_type == FLOAT_T) {
       value = to_float_type(value);
     }
-    builder->create_ret(value);
+    // builder->create_ret(value);
+    builder->create_store(value, context.return_value);
   }
+  builder->create_br(context.return_bb);
   return nullptr;
 }
 

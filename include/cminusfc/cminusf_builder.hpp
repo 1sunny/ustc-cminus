@@ -245,6 +245,8 @@ class CminusfBuilder : public syntax_tree_visitor {
         std::vector<WhileCondBB> while_condBB_stack;
         std::vector<bool> load_lval{true};
         bool from_param_array{false};
+        BasicBlock* return_bb;
+        Value* return_value;
     } context;
 
     Value *get_lval_location(const AstLVal &lval);
