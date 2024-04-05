@@ -668,7 +668,14 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   }
 
   node.Block->accept(*this);
-
+  if(not builder->get_insert_block()->is_terminated()) {
+    if(context.func->get_return_type() == FLOAT_T) {
+      builder->create_store(CONST_FP(0), context.return_value);
+    } else if(context.func->get_return_type() == INT32_T) {
+      builder->create_store(CONST_INT(0), context.return_value);
+    }
+    builder->create_br(context.return_bb);
+  }
   // ?
   // retBB move to instruction list end?
   builder->set_insert_point(retBB);
@@ -678,6 +685,7 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   else
     builder->create_ret(builder->create_load(context.return_value));
 
+  // TODO 把return bb放在最后?
   scope.exit();
   return nullptr;
 }
@@ -775,10 +783,11 @@ Value* CminusfBuilder::visit(AstSelectStmt &node) {
     }
   }
   builder->set_insert_point(exitBB);
-  if(exitBB->get_pre_basic_blocks().empty()) { // builder->create_br(exitBB);中会维护pre_basic_blocks
-    builder->set_insert_point(trueBB);
-    exitBB->erase_from_parent();
-  }
+  //
+  // if(exitBB->get_pre_basic_blocks().empty()) { // builder->create_br(exitBB);中会维护pre_basic_blocks
+  //   builder->set_insert_point(trueBB);
+  //   exitBB->erase_from_parent();
+  // }
   return nullptr;
 }
 

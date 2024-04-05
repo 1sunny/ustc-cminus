@@ -1,0 +1,27 @@
+void test_if1() {
+  int x;
+  int y;
+  if (x>y){
+    return;
+  }else{
+    return;
+  }
+  x=1;
+}
+void test_if2() {
+  int x;
+  int y;
+  if (x>y){
+    return;
+  }
+  x=1;
+}
+void test_if3() {
+  int x;
+  int y;
+  if (x > y) {
+  }
+}
+int main() {
+
+}

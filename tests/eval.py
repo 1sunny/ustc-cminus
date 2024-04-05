@@ -38,7 +38,7 @@ def compile_and_run_cminusfc(source_file):
 
 def main(folder_path):
     for file in sorted(os.listdir(folder_path)):
-        if file.endswith(".sy"):
+        if file.endswith(".sy") or file.endswith(".cminus"):
             sy_file = os.path.join(folder_path, file)
             out_file = os.path.join(folder_path, os.path.splitext(file)[0] + ".out")
             if os.path.exists(out_file):
