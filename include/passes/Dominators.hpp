@@ -32,4 +32,20 @@ class Dominators : public Pass {
     std::map<BasicBlock *, BasicBlock *> idom_{};  // 直接支配
     std::map<BasicBlock *, BBSet> dom_frontier_{}; // 支配边界集合
     std::map<BasicBlock *, BBSet> dom_tree_succ_blocks_{}; // 支配树中的后继节点
+
+    void get_reverse_postorder(Function *f);
+    void search(BasicBlock *block);
+    BasicBlock *intersect(BasicBlock *b1, BasicBlock *b2);
+    void print_dom_tree(Function *f);
+    void print_dom_frontier();
+
+private:
+    std::vector<BasicBlock *> reverse_postorder_{};
+    std::vector<BasicBlock *> dom_tree_postorder_{};
+    int timestamp = 1;
+    std::unordered_map<BasicBlock *, int> bb_timestamp_{};
+    std::unordered_map<BasicBlock *, bool> visited_{};
+    std::unordered_map<BasicBlock *, bool> processed_{};
+
+    void get_dom_tree_postorder(BasicBlock *block);
 };
