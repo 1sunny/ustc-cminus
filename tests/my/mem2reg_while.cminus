@@ -1,0 +1,13 @@
+int main(void) {
+  int x=1,y=3,z=5;
+  while(x < y) {
+    while(y < z) {
+      y = y + 1;
+    }
+    x = x + 1;
+  }
+  output(x);
+  output(y);
+  output(z);
+}
+
