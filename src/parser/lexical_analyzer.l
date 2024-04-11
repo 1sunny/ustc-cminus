@@ -1,13 +1,16 @@
 %option noyywrap
+%x StateNestedComment
+%x StateLineComment
+
 %{
 #include "driver.hpp"
 
 // Code run each time a pattern is matched.
 # define YY_USER_ACTION  loc.columns (yyleng);
 
+// "."(点)的作用是匹配除了"\n"（换行符）以外的任何单个字符
 %}
-SINGLE_LINE_COMMENT "//".*$
-MULTI_LINE_COMMENT "/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
+
 IDENTIFIER [a-zA-Z_][a-zA-Z0-9_]*
 INTEGER ([1-9][0-9]*|0[0-7]*|(0x|0X)[0-9a-fA-F]*)
 DEC_FP ((([0-9]*[.][0-9]*([eE][+-]?[0-9]+)?)|([0-9]+[eE][+-]?[0-9]+))[fLlL]?)
@@ -58,8 +61,27 @@ continue    {return yy::parser::make_CONTINUE(loc);}
 "\n"        {loc.lines(yyleng);}
 [ \t\r\f\v] {}
 "[]" 		{return yy::parser::make_ARRAY(loc);}
-{MULTI_LINE_COMMENT}    {}
-{SINGLE_LINE_COMMENT}   {}
+
+"//" { BEGIN(StateLineComment); }
+<StateLineComment>.*
+<StateLineComment>\n {
+  loc.lines(yyleng);
+  BEGIN(INITIAL);
+}
+
+"/*" {
+  BEGIN(StateNestedComment);
+}
+<StateNestedComment>"*/" {
+  BEGIN(INITIAL);
+}
+<StateNestedComment>.
+<StateNestedComment>\n { loc.lines(yyleng); }
+<StateNestedComment><<EOF>> {
+  BEGIN(INITIAL);
+  exit(999);
+}
+
 {IDENTIFIER}            {return yy::parser::make_IDENTIFIER(yytext, loc);}
 {INTEGER}               {return yy::parser::make_INTEGER_CONST(std::stoi(yytext,nullptr,0),loc);}
 ({DEC_FP}|{HEX_FP})     {return yy::parser::make_FLOAT_CONST(std::stof(yytext,nullptr),loc);}

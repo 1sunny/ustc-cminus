@@ -34,8 +34,8 @@ add_library(syntax STATIC
 include_directories(${PROJECT_BINARY_DIR})
 add_executable(parser parser.cpp lexical_analyzer.cpp)
 target_link_libraries(parser syntax common)
-#add_executable(lexer lexer.cpp)
-#target_link_libraries(lexer syntax common)
+add_executable(lexer lexer.cpp)
+target_link_libraries(lexer syntax common)
 
 install(
     TARGETS parser

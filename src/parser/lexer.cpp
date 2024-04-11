@@ -2,19 +2,7 @@
 #include<stdlib.h>
 #include<string.h>
 #include<syntax_analyzer.hpp>
-
-///
-extern int lines;
-extern int pos_start;
-extern int pos_end;
-
-///
-extern FILE *yyin;
-extern char *yytext;
-extern int yylex();
-
-// Mac-only hack.
-YYSTYPE yylval;
+#include "driver.hpp"
 
 ///
 int main(int argc, const char **argv) {
@@ -23,19 +11,27 @@ int main(int argc, const char **argv) {
           return 0;
      }
 
-     const char *input_file = argv[1];
-     yyin = fopen(input_file, "r");
-     if (!yyin) {
-          fprintf(stderr, "cannot open file: %s\n", input_file);
-          return 1;
-     }
+     CminusFlexLexer lexer;
+     std::string file = std::string(argv[1]);
+     lexer.loc.initialize(&file);
+     std::ifstream instream;
+     lexer.set_debug(true);
 
-     int token;
-     printf("%5s\t%10s\t%s\t%s\n", "Token", "Text", "Line", "Column (Start,End)");
-     while ((token = yylex()) != END) {
-          printf("%-5d\t%10s\t%d\t(%d,%d)\n",
-                 token, yytext,
-                 lines, pos_start, pos_end);
+     instream.open(file);
+     if (!instream.is_open()) {
+          std::cerr << "can't open file: " << file << std::endl;
+          exit(1);
+     }
+     //
+     lexer.switch_streams(&instream, nullptr);
+     driver driver;
+
+     while (true) {
+          yy::parser::symbol_type tok = lexer.yylex(driver);
+          std::cout << tok.location << ": " << tok.name() << std::endl;
+          if (tok.kind_ == yy::parser::symbol_kind_type::S_END) {
+               break;
+          }
      }
      return 0;
 }
