@@ -197,4 +197,24 @@ void Mem2Reg::rename(BasicBlock *bb) {
             }
         }
     }
+    std::unordered_set<Instruction *> wait_del{};
+    for (Instruction *i : bb->get_instructions()) {
+        if (i->is_alloca()) {
+            AllocaInst *alloc = dynamic_cast<AllocaInst *>(i);
+            Type *alloca_type = alloc->get_alloca_type();
+            if (alloca_type->is_pointer_type() || alloca_type->is_array_type()) {
+                continue;
+            }
+            MY_ASSERT(alloca_type->is_float_type() || alloca_type->is_integer_type());
+            for (Use use : i->get_use_list()) {
+                auto *ins = dynamic_cast<Instruction *>(use.val_);
+                MY_ASSERT(ins && (ins->is_store() || ins->is_load()));
+                wait_del.insert(ins);
+            }
+        }
+    }
+    for (auto inst : wait_del)
+        inst->remove_all_operands();
+    for (auto inst : wait_del)
+        inst->get_parent()->erase_instr(inst);
 }
