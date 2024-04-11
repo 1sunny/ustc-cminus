@@ -1,6 +1,7 @@
 #include <queue>
 #include "Dominators.hpp"
 #include "myassert.h"
+#include "logging.hpp"
 
 void Dominators::run() {
     for (auto &f1 : m_->get_functions()) {
@@ -14,6 +15,13 @@ void Dominators::run() {
             dom_tree_succ_blocks_.insert({bb, {}});
         }
 
+        reverse_postorder_.clear();
+        dom_tree_postorder_.clear();
+        timestamp = 1;
+        bb_timestamp_.clear();
+        visited_.clear();
+        processed_.clear();
+
         get_reverse_postorder(f);
 
         create_idom(f);
@@ -21,7 +29,7 @@ void Dominators::run() {
         create_dom_tree_succ(f);
 
         print_dom_tree(f);
-        print_dom_frontier();
+        print_dom_frontier(f);
     }
 }
 
@@ -42,7 +50,7 @@ void Dominators::get_reverse_postorder(Function *f) {
     reverse_postorder_.reserve(f->get_num_basic_blocks());
     search(entry_block);
     std::reverse(reverse_postorder_.begin(), reverse_postorder_.end());
-    std::cout << "reverse postorder:\n";
+    LOG_DEBUG << f->get_name() << " reverse postorder:";
     for (const auto &item: reverse_postorder_) {
       std::cout << item->get_name() << ", ";
     }
@@ -76,7 +84,7 @@ void Dominators::create_idom(Function *f) {
     while (changed) {
         changed = false;
         for (BasicBlock* b: reverse_postorder_) {
-            std::cout << b->get_name() << std::endl;
+            LOG_DEBUG << b->get_name();
             if (b == f->get_entry_block()) {
                 continue;
             }
@@ -90,14 +98,14 @@ void Dominators::create_idom(Function *f) {
                 }
             }
             for (BasicBlock* p: b->get_pre_basic_blocks()) {
-                std::cout << p->get_name() << std::endl;
+                LOG_DEBUG << p->get_name();
                 if (p != choose_p && idom_[p] != nullptr) {
                     new_idom = intersect(p, new_idom);
                 }
             }
             processed_[b] = true;
             if (idom_[b] != new_idom) {
-                std::cout << b->get_name() << " set idm: " << new_idom->get_name() << std::endl;
+                LOG_DEBUG << b->get_name() << " set idom: " << new_idom->get_name();
                 idom_[b] = new_idom;
                 changed = true;
             }
@@ -164,7 +172,7 @@ void Dominators::create_dom_tree_succ(Function *f) {
 }
 
 void Dominators::print_dom_tree(Function *f) {
-  std::cout << "\ndom tree:\n";
+  LOG_DEBUG << f->get_name() << " dom tree:";
   std::queue<BasicBlock*> q_cur, q_next;
   q_next.push(f->get_entry_block());
 
@@ -184,8 +192,8 @@ void Dominators::print_dom_tree(Function *f) {
   }
 }
 
-void Dominators::print_dom_frontier() {
-  std::cout << "\ndom frontier:\n";
+void Dominators::print_dom_frontier(Function *f) {
+  LOG_DEBUG << f->get_name() << " dom frontier:";
   for (BasicBlock *b: reverse_postorder_) {
     std::cout << b->get_name() << ": ";
     for (BasicBlock *item: dom_frontier_[b]) {

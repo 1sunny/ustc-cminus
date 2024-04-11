@@ -37,7 +37,7 @@ class Dominators : public Pass {
     void search(BasicBlock *block);
     BasicBlock *intersect(BasicBlock *b1, BasicBlock *b2);
     void print_dom_tree(Function *f);
-    void print_dom_frontier();
+    void print_dom_frontier(Function *f);
 
 private:
     std::vector<BasicBlock *> reverse_postorder_{};

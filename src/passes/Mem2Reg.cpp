@@ -20,6 +20,10 @@ void Mem2Reg::run() {
             continue;
         func_ = f;
         if (func_->get_basic_blocks().size() >= 1) {
+            bb_phi2value_.clear();
+            bb_value2phi_.clear();
+            stack_.clear();
+
             // 对应伪代码中 phi 指令插入的阶段
             generate_phi();
             // 对应伪代码中重命名阶段
