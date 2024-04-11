@@ -238,6 +238,16 @@ Value* CminusfBuilder::visit(AstVarDecl &node) {
   return nullptr;
 }
 
+Value * CminusfBuilder::convertType(Value *value, Type* type) {
+  if (type->is_float_type()) {
+    return to_float_type(value);
+  } else if (type->is_integer_type()) {
+    return to_int32_type(value);
+  } else {
+    MY_ASSERT(false);
+  }
+}
+
 void CminusfBuilder::initializeArray(int u, int& curr,
                                      std::vector<Value*>& pos, std::vector<int> array_exps_int, bool const_array) {
     if (u == array_exps_int.size()) {
@@ -268,13 +278,7 @@ void CminusfBuilder::initializeArray(int u, int& curr,
       // TODO 判断类型是否匹配,clang是运行数组初始化时进行float与int间的隐式转换
       MY_ASSERT(context.decl_type == pos.back()->get_type()->get_pointer_element_type());
       // TODO 很多地方有这种代码,考虑用函数
-      if (context.decl_type->is_float_type()) {
-        pValue = to_float_type(pValue);
-      } else if (context.decl_type->is_integer_type()) {
-        pValue = to_int32_type(pValue);
-      } else {
-        MY_ASSERT(false);
-      }
+      pValue = convertType(pValue, context.decl_type);
       builder->create_store(pValue, pos.back());
       return;
     }
@@ -498,6 +502,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
       // 应该放在scope.push后面, 比如 int a = a;
       // node.InitVal语义检查
       if (init_value) {
+        init_value = convertType(init_value, context.decl_type);
         builder->create_store(init_value, pInst);
       }
     }
@@ -736,15 +741,8 @@ Value* CminusfBuilder::visit(AstAssignStmt &node) {
   // TODO 类型转换
   Type *loc_type = loc->get_type()->get_pointer_element_type();
   MY_ASSERT(loc->get_type()->is_pointer_type()
-            && loc_type->is_float_type()
-            || loc_type->is_integer_type());
-  if (loc_type == INT32_T) {
-    value = to_int32_type(value);
-  } else if (loc_type == FLOAT_T) {
-    value = to_float_type(value);
-  } else {
-    MY_ASSERT(false);
-  }
+            && (loc_type->is_float_type() || loc_type->is_integer_type()));
+  value = convertType(value, loc_type);
   return builder->create_store(value, loc);
 }
 
@@ -841,11 +839,7 @@ Value* CminusfBuilder::visit(AstReturnStmt &node) {
     // You need to solve other return cases (e.g. return an integer).
     Value *value = node.Exp->accept(*this);
     MY_ASSERT(return_type->is_float_type() || return_type->is_integer_type());
-    if (return_type == INT32_T) {
-      value = to_int32_type(value);
-    } else if (return_type == FLOAT_T) {
-      value = to_float_type(value);
-    }
+    value = convertType(value, return_type);
     // builder->create_ret(value);
     builder->create_store(value, context.return_value);
   }
@@ -876,11 +870,7 @@ Value* CminusfBuilder::visit(AstCallee &node) {
       }
     } else {
       MY_ASSERT(pArgument->get_type()->is_float_type() || pArgument->get_type()->is_integer_type());
-      if (pArgument->get_type()->is_float_type()) {
-        pValue = to_float_type(pValue);
-      } else if (pArgument->get_type()->is_int32_type()) {
-        pValue = to_int32_type(pValue);
-      }
+      pValue = convertType(pValue, pArgument->get_type());
     }
     if (pArgument->get_type()->is_pointer_type()) { // 参数是数组形式
       context.load_lval.pop_back();
@@ -903,7 +893,7 @@ Value* CminusfBuilder::visit(AstLVal &node) {
   if (type == Scope::VarType::ConstGlobalVar || type == Scope::VarType::ConstLocalVar) {
     if (auto constInt = dynamic_cast<ConstantInt*>(pValue); constInt) {
       return CONST_INT(constInt->get_value());
-    } else if (auto constFp = dynamic_cast<ConstantInt*>(pValue); constFp) {
+    } else if (auto constFp = dynamic_cast<ConstantFP*>(pValue); constFp) {
       return CONST_FP(constFp->get_value());
     } else {
       MY_ASSERT(false);

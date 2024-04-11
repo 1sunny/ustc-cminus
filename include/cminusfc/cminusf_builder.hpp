@@ -318,4 +318,6 @@ class CminusfBuilder : public syntax_tree_visitor {
     void set_context_const_init(AstConstDef &node);
 
     void set_context_const_array_init_value(AstConstDef &node, std::vector<int> array_exps_int);
+
+    Value *convertType(Value *value, Type *type);
 };
