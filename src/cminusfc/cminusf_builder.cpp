@@ -783,11 +783,15 @@ Value* CminusfBuilder::visit(AstSelectStmt &node) {
     }
   }
   builder->set_insert_point(exitBB);
-  //
-  // if(exitBB->get_pre_basic_blocks().empty()) { // builder->create_br(exitBB);中会维护pre_basic_blocks
-  //   builder->set_insert_point(trueBB);
-  //   exitBB->erase_from_parent();
-  // }
+
+  // bug find by 10_if_else.sy: basic block with no pred should be deleted
+  if(exitBB->get_pre_basic_blocks().empty()) { // builder->create_br(exitBB);中会维护pre_basic_blocks
+    // 这种情况一定是在if和else中*都*return了,但还是需要设置一个插入点,block中会判断结束,就不再继续了
+    // if(builder->get_insert_block()->is_terminated()) { break; }
+    builder->set_insert_point(trueBB);
+    // builder->set_insert_point(nullptr);
+    exitBB->erase_from_parent();
+  }
   return nullptr;
 }
 

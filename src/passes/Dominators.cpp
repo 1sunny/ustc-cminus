@@ -103,6 +103,10 @@ void Dominators::create_idom(Function *f) {
             }
         }
     }
+    // bug find by 10_if_else.sy: basic block with no pred should be deleted
+    for (BasicBlock* b: reverse_postorder_) {
+      MY_ASSERT(idom_[b] != nullptr);
+    }
 }
 
 void Dominators::get_dom_tree_postorder(BasicBlock *block) {
