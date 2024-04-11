@@ -1000,7 +1000,8 @@ Value* CminusfBuilder::visit(AstUnaryExp &node) {
       } else if (node.op == UnaryOp::OP_POS) {
         return constInt;
       } else {
-        MY_ASSERT(false); // TODO '!'仅出现在条件表达式中
+        // TODO '!'仅出现在条件表达式中
+        return CONST_BOOL(constInt == CONST_INT(0));
       }
     } else if (auto constFp = to_const<ConstantFP>(pValue); constFp) {
       if (node.op == UnaryOp::OP_NEG) {
@@ -1008,7 +1009,7 @@ Value* CminusfBuilder::visit(AstUnaryExp &node) {
       } else if (node.op == UnaryOp::OP_POS) {
         return constFp;
       } else {
-        MY_ASSERT(false); // '!'仅出现在条件表达式中
+        return CONST_BOOL(constFp == CONST_FP(0));
       }
     } else if (pValue->get_type()->is_integer_type()) {
       if (node.op == UnaryOp::OP_NEG) {
@@ -1016,7 +1017,7 @@ Value* CminusfBuilder::visit(AstUnaryExp &node) {
       } else if (node.op == UnaryOp::OP_POS) {
         return pValue;
       } else {
-        MY_ASSERT(false);
+        return builder->create_icmp_eq(pValue, CONST_INT(0));
       }
     } else if (pValue->get_type()->is_float_type()) {
       if (node.op == UnaryOp::OP_NEG) {
@@ -1024,7 +1025,7 @@ Value* CminusfBuilder::visit(AstUnaryExp &node) {
       } else if (node.op == UnaryOp::OP_POS) {
         return pValue;
       } else {
-        MY_ASSERT(false);
+        return builder->create_fcmp_eq(pValue, CONST_FP(0));
       }
     }
   }
