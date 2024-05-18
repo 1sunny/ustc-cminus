@@ -5,3 +5,17 @@ jianmu-supplemental-master/
 Note.md
 lecture/
 **/**/*.ll
+tests/**/*.s
+tests/**/*.hasm
+/cmu
+/LLVM Pass course
+/DCC888
+/COMP 512 Advanced Compiler Construction
+/.vscode
+/paper
+/book
+/other doc
+/SSA book trans
+/Note.img
+/Note.md
+SSA.md

@@ -8,9 +8,9 @@ class CodeGen {
   public:
     explicit CodeGen(Module *module) : m(module) {}
 
-    std::string print() const;
+    std::string print() const; // 将汇编指令格式化输出
 
-    void run();
+    void run(); // 后端代码生成的入口函数
 
     template <class... Args> void append_inst(Args... arg) {
         output.emplace_back(arg...);
@@ -29,6 +29,7 @@ class CodeGen {
     }
 
   private:
+    // 栈式分配的变量分配环节，将在函数翻译开始时调用
     void allocate();
 
     // 向寄存器中装载数据
@@ -81,8 +82,8 @@ class CodeGen {
             offset_map.clear();
         }
 
-    } context;
+    } context;                        // 类似 lab2 的 context，用于保存翻译过程中的上下文信息，如当前所在函数
 
-    Module *m;
-    std::list<ASMInstruction> output;
+    Module *m;                        // 输入的 IR 模块
+    std::list<ASMInstruction> output; // 生成的汇编指令
 };

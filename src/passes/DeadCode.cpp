@@ -1,5 +1,6 @@
 #include "DeadCode.hpp"
 #include "logging.hpp"
+#include "myassert.h"
 
 // 处理流程：两趟处理，mark 标记有用变量，sweep 删除无用指令
 void DeadCode::run() {
@@ -44,6 +45,8 @@ void DeadCode::mark(Instruction *ins) {
             continue;
         if (marked[def])
             continue;
+        // 如果是Instruction,那应该是在同一个函数吧??
+        MY_ASSERT(def->get_function() == ins->get_function());
         if (def->get_function() != ins->get_function())
             continue;
         marked[def] = true;

@@ -164,6 +164,9 @@ void Mem2Reg::rename(BasicBlock *bb) {
             Value *x = i->get_operand(0);
             LOG_DEBUG << x->get_name();
             if (is_valid_ptr(x)) {
+                // 什么情况会出现mem2reg时,load时却没有定义,需要undef
+                // int a;
+                // int b = a;
                 MY_ASSERT(not stack_[x].empty());
                 // 可能会是空
                 i->replace_all_use_with(stack_[x].top());

@@ -19,6 +19,7 @@ void CodeGen::allocate() {
             // 每个非 void 的定值都分配栈空间
             if (not instr->is_void()) {
                 auto size = instr->get_type()->get_size();
+                // ALIGN ?
                 offset = ALIGN(offset + size, size);
                 context.offset_map[instr] = -static_cast<int>(offset);
             }

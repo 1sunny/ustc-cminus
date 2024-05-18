@@ -158,6 +158,12 @@ Build_DF() {
         if (idom(Y) != N)
           DF(N) := DF(N) ∪ {Y}
 }
+
+for (a,b) in CFG edges, do:
+  x <- a
+  while x does not strictly dominate b, do:
+    DF(x) <- DF(x) + b
+    x <- immediate dominator(x)
  */
 }
 
