@@ -146,7 +146,7 @@ void Mem2Reg::rename(BasicBlock *bb) {
     LOG_DEBUG << bb->get_name();
     // std::unordered_map<Value*, std::stack<Value*>> stack_;
     for (Instruction *i : bb->get_instructions()) {
-        LOG_DEBUG << i->get_name() << ":" << i->get_type();
+        LOG_DEBUG << i->get_name() << ":" << i->get_type()->print();
         if (i->is_phi()) {
             // find the phi function to which Memory Variables i belongs
             Value *x = bb_phi2value_[bb][i];

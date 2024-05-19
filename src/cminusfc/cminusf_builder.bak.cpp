@@ -124,7 +124,7 @@ Value* CminusfBuilder::visit(AstConstDef &node) {
       Constant* init = get_global_constant_init(init_value);
       MY_ASSERT(init);
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, true, init);
-      scope.push(node.id, init, Scope::VarType::ConstGlobalVar, {});
+      scope.push(node.id, init, Scope::VarType::ConstGlobalVar);
     } else { // context.global
       BasicBlock *entry_block = context.func->get_entry_block();
       Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
@@ -141,22 +141,17 @@ Value* CminusfBuilder::visit(AstConstDef &node) {
       builder->set_insert_point(curr_block);
 
       builder->create_store(init_value, pInst);
-      scope.push(node.id, init_value, Scope::VarType::ConstLocalVar, {});
+      scope.push(node.id, init_value, Scope::VarType::ConstLocalVar);
     }
   } else { // array_exps.empty()
-    int total = 1;
-    for (const int &d: array_exps_int) {
-      total *= d;
-    }
-    context.curr_array_type = set_context_array_type(array_exps_int);
-    Type *one_d_array_type = ArrayType::get(context.decl_type, total);
+    Type* array_type = set_context_array_type(array_exps_int);
     set_context_const_array_init_value(node, array_exps_int);
 
     if (context.global) {
-      Constant* init = get_global_array_constant_init(one_d_array_type, array_exps_int, true);
+      Constant* init = get_global_array_constant_init(array_type, array_exps_int, true);
       MY_ASSERT(init);
-      GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), one_d_array_type, true, init);
-      scope.push(node.id, pVariable, Scope::VarType::ConstGlobalArray, array_exps_int);
+      GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, true, init);
+      scope.push(node.id, pVariable, Scope::VarType::ConstGlobalArray);
     } else { // context.global
       BasicBlock *entry_block = context.func->get_entry_block();
       Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
@@ -165,16 +160,18 @@ Value* CminusfBuilder::visit(AstConstDef &node) {
 
       BasicBlock *curr_block = builder->get_insert_block();
       builder->set_insert_point(entry_block);
-      AllocaInst *pInst = builder->create_alloca(one_d_array_type);
+      AllocaInst *pInst = builder->create_alloca(array_type);
 
       if(terminator != nullptr)
         entry_block->add_instruction(terminator);
 
       builder->set_insert_point(curr_block);
 
-      scope.push(node.id, pInst, Scope::VarType::ConstLocalArray, array_exps_int);
+      scope.push(node.id, pInst, Scope::VarType::ConstLocalArray);
       MY_ASSERT(not context.const_array_init.empty());
-      initializeArray(pInst, total, true);
+      std::vector<Value*> pos{pInst};
+      int curr = 0;
+      initializeArray(0, curr, pos, array_exps_int, true);
     }
   }
   return nullptr;
@@ -251,36 +248,48 @@ Value * CminusfBuilder::convertType(Value *value, Type* type) {
   }
 }
 
-void CminusfBuilder::initializeArray(AllocaInst *base, int total, bool const_array) {
-  for (int i = 0; i < total; ++i) {
-    GetElementPtrInst *addr = builder->create_gep(base, {CONST_INT(0), CONST_INT(i)});
-    Value* pValue;
-    if (const_array) {
-      if (context.const_array_init[i] == nullptr) {
-        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
-                                              : static_cast<Value*>(CONST_FP(0));
+void CminusfBuilder::initializeArray(int u, int& curr,
+                                     std::vector<Value*>& pos, std::vector<int> array_exps_int, bool const_array) {
+    if (u == array_exps_int.size()) {
+      // TODO context.array_init[curr++] = nullptr
+      Value* pValue;
+      if (const_array) {
+        if (context.const_array_init[curr] == nullptr) {
+          pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                                : static_cast<Value*>(CONST_FP(0));
+          curr++;
+        } else {
+          pValue = context.const_array_init[curr++]->accept(*this);
+        }
+        // TODO 判断是否是常量
+        if (auto constant = dynamic_cast<Constant*>(pValue);
+            not (constant && (constant->get_type()->is_float_type() || constant->get_type()->is_integer_type()))){
+              semantic_error() << "global init must be constant.\n";
+        }
       } else {
-        pValue = context.const_array_init[i]->accept(*this);
+        if (context.array_init[curr] == nullptr) {
+          pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
+                                                : static_cast<Value*>(CONST_FP(0));
+          curr++;
+        } else {
+          pValue = context.array_init[curr++]->accept(*this);
+        }
       }
-      // TODO 判断是否是常量
-      if (auto constant = dynamic_cast<Constant*>(pValue);
-              not (constant && (constant->get_type()->is_float_type() || constant->get_type()->is_integer_type()))){
-        semantic_error() << "global init must be constant.\n";
-      }
-    } else {
-      if (context.array_init[i] == nullptr) {
-        pValue = context.decl_type == INT32_T ? static_cast<Value*>(CONST_INT(0))
-                                              : static_cast<Value*>(CONST_FP(0));
-      } else {
-        pValue = context.array_init[i]->accept(*this);
-      }
+      // TODO 判断类型是否匹配,clang是运行数组初始化时进行float与int间的隐式转换
+      MY_ASSERT(context.decl_type == pos.back()->get_type()->get_pointer_element_type());
+      // TODO 很多地方有这种代码,考虑用函数
+      pValue = convertType(pValue, context.decl_type);
+      builder->create_store(pValue, pos.back());
+      return;
     }
-    // TODO 判断类型是否匹配,clang是运行数组初始化时进行float与int间的隐式转换
-    // MY_ASSERT(context.decl_type == pos.back()->get_type()->get_pointer_element_type());
-    // TODO 很多地方有这种代码,考虑用函数
-    pValue = convertType(pValue, context.decl_type);
-    builder->create_store(pValue, addr);
-  }
+    pos.push_back(builder->create_gep(pos.back(), {CONST_INT(0), CONST_INT(0)}));
+    for (int i = 0; i < array_exps_int[u]; ++i) {
+      if (i != 0) {
+        pos.back() = builder->create_gep(pos.back(), {CONST_INT(1)});
+      }
+      initializeArray(u + 1, curr, pos, array_exps_int, const_array);
+    }
+    pos.pop_back();
 }
 
 std::vector<int> CminusfBuilder::defInit(const std::string& id, std::vector<std::shared_ptr<AstConstExp>>& ArrayConstExpList) {
@@ -384,7 +393,7 @@ Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::
   // int y[3] = {x}; error: initializer element is not a compile-time constant
   Constant* init = nullptr;
 
-  std::vector<Constant*> queue;
+  std::queue<Constant*> queue;
   int total_elem;
   // TODO const全局数组和全局数组, C语言全局初始化必须是常量
   if (not const_array and not context.array_init.empty()) {
@@ -398,7 +407,7 @@ Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::
         pValue = item->accept(*this);
       }
       if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
-        queue.push_back(constant);
+        queue.push(constant);
       } else {
         semantic_error() << "global init must be constant.\n";
       }
@@ -414,7 +423,7 @@ Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::
         pValue = item->accept(*this);
       }
       if (auto* constant = dynamic_cast<Constant*>(pValue); constant) {
-        queue.push_back(constant);
+        queue.push(constant);
       } else {
         semantic_error() << "global init must be constant.\n";
       }
@@ -422,8 +431,26 @@ Constant* CminusfBuilder::get_global_array_constant_init(Type* array_type, std::
   }
   if (not queue.empty()) {
     Type* curr_type = context.decl_type == INT32_T ? INT32_T : FLOAT_T;
-    Constant *pArray = ConstantArray::get(ArrayType::get(curr_type, queue.size()), queue);
-    init = pArray;
+    int denominator = 1;
+    for (auto it = array_exps_int.rbegin(); it != array_exps_int.rend(); ++it) {
+      int bound = *it;
+      denominator *= bound;
+      curr_type = ArrayType::get(curr_type, bound);
+      MY_ASSERT(total_elem % denominator == 0);
+      int step = total_elem / denominator;
+      for (int i = 0; i < step; ++i) {
+        std::vector<Constant*> constants;
+        constants.reserve(bound);
+        for (int j = 0; j < bound; ++j) {
+          constants.push_back(queue.front());
+          queue.pop();
+        }
+        Constant *pArray = ConstantArray::get(static_cast<ArrayType *>(curr_type), constants);
+        queue.push(pArray);
+      }
+    }
+    MY_ASSERT(queue.size() == 1);
+    init = queue.front();
   } else { // node.InitVal
     init = ConstantZero::get(array_type, module.get());
   }
@@ -455,7 +482,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
       // global int x = x; error
       // local int x = x; ok
       GlobalVariable *pGlobal = GlobalVariable::create(node.id, module.get(), context.decl_type, false, init);
-      scope.push(node.id, pGlobal, Scope::VarType::GlobalVar, {});
+      scope.push(node.id, pGlobal, Scope::VarType::GlobalVar);
     } else { // context.global
       BasicBlock *entry_block = context.func->get_entry_block();
       Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
@@ -471,7 +498,7 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
 
       builder->set_insert_point(curr_block);
 
-      scope.push(node.id, pInst, Scope::VarType::LocalVar, {});
+      scope.push(node.id, pInst, Scope::VarType::LocalVar);
       // 应该放在scope.push后面, 比如 int a = a;
       // node.InitVal语义检查
       if (init_value) {
@@ -480,38 +507,35 @@ Value* CminusfBuilder::visit(AstVarDef &node) {
       }
     }
   } else { // array_exps.empty()
-    int total = 1;
-    for (const int &d: array_exps_int) {
-      total *= d;
-    }
-    context.curr_array_type = set_context_array_type(array_exps_int);
-    Type *one_d_array_type = ArrayType::get(context.decl_type, total);
+    Type* array_type = set_context_array_type(array_exps_int);
     set_context_array_init_value(node, array_exps_int);
 
     if (context.global) {
-      Constant* init = get_global_array_constant_init(one_d_array_type, array_exps_int, false);
+      Constant* init = get_global_array_constant_init(array_type, array_exps_int, false);
       MY_ASSERT(init);
-      GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), one_d_array_type, false, init);
-      scope.push(node.id, pVariable, Scope::VarType::GlobalArray, array_exps_int);
+      GlobalVariable *pVariable = GlobalVariable::create(node.id, module.get(), array_type, false, init);
+      scope.push(node.id, pVariable, Scope::VarType::GlobalArray);
     } else { // context.global
-      BasicBlock *entry_block = context.func->get_entry_block();
-      Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
-      if(terminator != nullptr)
-        entry_block->get_instructions().pop_back();
+      // BasicBlock *entry_block = context.func->get_entry_block();
+      // Instruction *terminator = entry_block->is_terminated() ? entry_block->get_terminator() : nullptr;
+      // if(terminator != nullptr)
+      //   entry_block->get_instructions().pop_back();
+      //
+      // BasicBlock *curr_block = builder->get_insert_block();
+      // builder->set_insert_point(entry_block);
+      AllocaInst *pInst = builder->create_alloca(array_type);
+      //
+      // if(terminator != nullptr)
+      //   entry_block->add_instruction(terminator);
+      //
+      // builder->set_insert_point(curr_block);
 
-      BasicBlock *curr_block = builder->get_insert_block();
-      builder->set_insert_point(entry_block);
-      AllocaInst *pInst = builder->create_alloca(one_d_array_type);
-
-      if(terminator != nullptr)
-        entry_block->add_instruction(terminator);
-
-      builder->set_insert_point(curr_block);
-
-      scope.push(node.id, pInst, Scope::VarType::LocalArray, array_exps_int); // 应该放在node.InitVal前面, 比如 int a = a;
+      scope.push(node.id, pInst, Scope::VarType::LocalArray); // 应该放在node.InitVal前面, 比如 int a = a;
       // TODO array_exps有用到吗, 可以用来检验数组访问是否合法, 没用, 直接用array_exps_int就行了
       if (!context.array_init.empty()) {
-        initializeArray(pInst, total, false);
+        std::vector<Value*> pos{pInst};
+        int curr = 0;
+        initializeArray(0, curr, pos, array_exps_int, false);
       }
       // TODO 怎么给所有元素初始化为 0?
     }
@@ -592,7 +616,6 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
   } else {
     assert("node.type");
   }
-  std::map<std::string, std::vector<int>> name_to_array_offsets;
   // TODO void时FuncFParamList有吗? 这里要改,目前还没有void,需要添加
   for (std::shared_ptr<AstFuncFParam> &param: node.FuncFParamList) {
     Type *param_type;
@@ -605,20 +628,12 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
       assert("param->type == TYPE_VOID");
     }
     if (param->isarray) {
-      std::vector<int> offsets;
       for (auto it = param->ParamArrayExpList.rbegin(); it != param->ParamArrayExpList.rend(); ++it) {
         Value *exp = (*it)->accept(*this);
         ConstantInt *bound = to_const_index(exp);
-        offsets.push_back(bound->get_value());
+        param_type = ArrayType::get(param_type, bound->get_value());
       }
-      offsets.push_back(-1);//第一位必须空缺
       param_type = PointerType::get(param_type);
-      std::reverse(offsets.begin(), offsets.end());
-      for (const auto &item: offsets) {
-        std::cout << item << ' ';
-      }
-      std::cout << '\n';
-      name_to_array_offsets.insert({param->id, offsets});
     }
     // 但其实clang是这样的:int a[][2][3] -> [2 x [3 x i32]]* %0, 会具体求出类型,而不是直接用ptr
     // push_back(std::move(type)): Std::move of the variable 'type' of the trivially-copyable type 'Type *' has no effect
@@ -628,7 +643,7 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
 
   fun_type = FunctionType::get(ret_type, param_types);
   auto func = Function::create(fun_type, node.id, module.get());
-  scope.push(node.id, func, Scope::VarType::Function, {});
+  scope.push(node.id, func, Scope::VarType::Function);
   context.func = func;
   auto funBB = BasicBlock::create(module.get(), "entry", func);
   builder->set_insert_point(funBB);
@@ -652,8 +667,7 @@ Value* CminusfBuilder::visit(AstFuncDef &node) {
     AllocaInst *pAlloca = builder->create_alloca(param_types[i]);
     builder->create_store(args[i], pAlloca);
     scope.push(node.FuncFParamList[i]->id, pAlloca, param_types[i]->is_pointer_type()
-                                                    ? Scope::VarType::ParamArray : Scope::VarType::ParamVar,
-                                                    name_to_array_offsets[node.FuncFParamList[i]->id]);
+                                                    ? Scope::VarType::ParamArray : Scope::VarType::ParamVar);
 
     // // accept返回void,但是需要子节点的返回值Value*,怎么处理比较好?
   }
@@ -851,11 +865,9 @@ Value* CminusfBuilder::visit(AstCallee &node) {
     // TODO 传数组应该传数组名(指针), 类型转换int,float
     Value *pValue = actual_param->accept(*this);
     if (pArgument->get_type()->is_pointer_type()) { // 参数是数组形式
-      // if (context.from_param_array) {
-      //   pValue = builder->create_gep(pValue, {CONST_INT(0)});
-      // } else {
-      //   pValue = builder->create_gep(pValue, {CONST_INT(0), CONST_INT(0)});
-      // }
+      if (not context.from_param_array) {
+        pValue = builder->create_gep(pValue, {CONST_INT(0), CONST_INT(0)});
+      }
     } else {
       MY_ASSERT(pArgument->get_type()->is_float_type() || pArgument->get_type()->is_integer_type());
       pValue = convertType(pValue, pArgument->get_type());
@@ -897,8 +909,8 @@ Value* CminusfBuilder::visit(AstLVal &node) {
   if (type == Scope::VarType::ParamArray) {
     loc = builder->create_load(pValue);
   }
-  if (type == Scope::VarType::ConstGlobalArray || type == Scope::VarType::ConstLocalArray
-   || type == Scope::VarType::GlobalArray || type == Scope::VarType::LocalArray || type == Scope::VarType::ParamArray) {
+  if (node.ArrayExpList.empty()) { // 这个也可能是传的数组名
+  } else {
     // param array 和 local定义的array访问区别:
     // define dso_local i32 @test4([6 x i32]* %0) #0 {
     //   %2 = alloca i32, align 4
@@ -921,7 +933,6 @@ Value* CminusfBuilder::visit(AstLVal &node) {
     //   %14 = load i32, i32* %2, align 4
     //   ret i32 %14
     // }
-    std::vector<Value*> offsets;
     for (int i = 0; i < node.ArrayExpList.size(); i++) {
       std::shared_ptr<AstExp> exp = node.ArrayExpList[i];
       context.load_lval.push_back(true);
@@ -932,52 +943,20 @@ Value* CminusfBuilder::visit(AstLVal &node) {
       offset = to_int32_type(offset);
 
       if (auto constInt = to_const<ConstantInt>(offset); constInt) {
-        std::cout << constInt->get_value() << '|';
         if (constInt->get_value() < 0) {
           semantic_error() << "negative index exception.\n";
         }
       }
-      offsets.push_back(offset);
-    }
-    std::cout << '\n';
-    std::vector<int> array_exps_int = valueWithType.array_exps;
-    while (offsets.size() < array_exps_int.size()) {
-      offsets.push_back(nullptr);
-    }
-    for (const auto &item: array_exps_int) {
-      std::cout << item << '|';
-    }
-    std::cout << '\n';
-    int n = array_exps_int.size();
-    for (int i = n-2; i >= 0; --i) {
-      array_exps_int[i] *= array_exps_int[i+1];
-    }
-    Value *offset = CONST_INT(0);
-    if (offsets.size() == 1) {
-      if (offsets[0] != nullptr) {
-        offset = offsets[0];
+      // fix bug: {offset} -> {CONST_INT(0), offset}
+      if (type == Scope::VarType::ParamArray && i == 0) {
+        loc = builder->create_gep(loc, {offset});
+      } else {
+        loc = builder->create_gep(loc, {CONST_INT(0), offset});
       }
-    } else {
-      if (offsets[0] != nullptr) {
-        offset = builder->create_imul(offsets[0], CONST_INT(array_exps_int[1]));
-      }
-      for (int i = 1; i < offsets.size() - 1; ++i) {
-        if (offsets[i] == nullptr) {
-          break;
-        }
-        Value *v = builder->create_imul(offsets[i], CONST_INT(array_exps_int[i+1]));
-        offset = builder->create_iadd(offset, v);
-      }
-      if (offsets.back() != nullptr) {
-        offset = builder->create_iadd(offset, offsets.back());
-      }
-    }
-    if (type == Scope::VarType::ParamArray) {
-      loc = builder->create_gep(loc, {offset});
-    } else {
-      loc = builder->create_gep(loc, {CONST_INT(0), offset});
+      // LOG_DEBUG << pValue->get_type()->print();
     }
   }
+  context.from_param_array = (type == Scope::VarType::ParamArray);
   // 什么时候create_load呢? Assign左边的lval不应该,但右边的exp就应该, 函数传参时普通变量应该load,数组传参不应该load
   // const变量应该直接返回第一次创建的变量,不要load,
   MY_ASSERT(loc->get_type()->is_pointer_type());

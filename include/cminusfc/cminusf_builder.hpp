@@ -10,19 +10,19 @@
 
 #include <map>
 #include <memory>
+#include <optional>
+#include <utility>
 
 class Scope {
   public:
     // enter a new scope
     void enter() {
       inner.emplace_back();
-      array_exps_inner.emplace_back();
     }
 
     // exit a scope
     void exit() {
       inner.pop_back();
-      array_exps_inner.pop_back();
     }
 
     bool in_global() { return inner.size() == 1; }
@@ -44,20 +44,21 @@ class Scope {
     struct ValueWithType {
         Value *val;
         VarType type;
+        std::vector<int> array_exps;
     };
 
     // push a name to scope
     // return true if successful
     // return false if this name already exits
-    bool push(const std::string& name, Value *val, VarType type) {
-        auto result = inner[inner.size() - 1].insert({name, {val, type}});
+    bool push(const std::string& name, Value *val, VarType type, std::vector<int> array_exps) {
+        auto result = inner[inner.size() - 1].insert({name, {val, type, std::move(array_exps)}});
         return result.second;
     }
 
-    bool push_array_exps(const std::string& name, const std::vector<int>& array_exps) {
-      auto result = array_exps_inner[array_exps_inner.size() - 1].insert({name, array_exps});
-      return result.second;
-    }
+    // bool push_array_exps(const std::string& name, const std::vector<int>& array_exps) {
+    //   auto result = array_exps_inner[array_exps_inner.size() - 1].insert({name, array_exps});
+    //   return result.second;
+    // }
 
     ValueWithType find(const std::string& name) {
         for (auto s = inner.rbegin(); s != inner.rend(); s++) {
@@ -73,23 +74,23 @@ class Scope {
         return {};
     }
 
-    std::vector<int> find_array_exps(const std::string& name) {
-      for (auto s = array_exps_inner.rbegin(); s != array_exps_inner.rend(); s++) {
-        auto iter = s->find(name);
-        if (iter != s->end()) {
-          return iter->second;
-        }
-      }
-
-      // Name not found: handled here?
-      assert(false && "array_exps not found in scope");
-
-      return {};
-    }
+    // std::optional<std::vector<int>> find_array_exps(const std::string& name) {
+    //   for (auto s = array_exps_inner.rbegin(); s != array_exps_inner.rend(); s++) {
+    //     auto iter = s->find(name);
+    //     if (iter != s->end()) {
+    //       return iter->second;
+    //     }
+    //   }
+    //
+    //   // Name not found: handled here?
+    //   // assert(false && "array_exps not found in scope");
+    //
+    //   return std::nullopt;
+    // }
 
   private:
     std::vector<std::map<std::string, ValueWithType>> inner;
-    std::vector<std::map<std::string, std::vector<int>>> array_exps_inner;
+    // std::vector<std::map<std::string, std::vector<int>>> array_exps_inner;
 };
 
 class CminusfBuilder : public syntax_tree_visitor {
@@ -161,22 +162,22 @@ class CminusfBuilder : public syntax_tree_visitor {
         auto *stoptime_fun = Function::create(stoptime_type, "_sysy_stoptime", module.get());
 
       scope.enter();
-        scope.push("input", input_fun, Scope::VarType::Function);
-        scope.push("output", output_fun, Scope::VarType::Function);
-        scope.push("outputFloat", output_float_fun, Scope::VarType::Function);
-        scope.push("neg_idx_except", neg_idx_except_fun, Scope::VarType::Function);
-        scope.push("getint", getint_fun, Scope::VarType::Function);
-        scope.push("getch", getch_fun, Scope::VarType::Function);
-        scope.push("getfloat", getfloat_fun, Scope::VarType::Function);
-        scope.push("getarray", getarray_fun, Scope::VarType::Function);
-        scope.push("getfarray", getfarray_fun, Scope::VarType::Function);
-        scope.push("putint", putint_fun, Scope::VarType::Function);
-        scope.push("putch", putch_fun, Scope::VarType::Function);
-        scope.push("putarray", putarray_fun, Scope::VarType::Function);
-        scope.push("putfloat", putfloat_fun, Scope::VarType::Function);
-        scope.push("putfarray", putfarray_fun, Scope::VarType::Function);
-        scope.push("starttime", starttime_fun, Scope::VarType::Function);
-        scope.push("stoptime", stoptime_fun, Scope::VarType::Function);
+        scope.push("input", input_fun, Scope::VarType::Function, {});
+        scope.push("output", output_fun, Scope::VarType::Function, {});
+        scope.push("outputFloat", output_float_fun, Scope::VarType::Function, {});
+        scope.push("neg_idx_except", neg_idx_except_fun, Scope::VarType::Function, {});
+        scope.push("getint", getint_fun, Scope::VarType::Function, {});
+        scope.push("getch", getch_fun, Scope::VarType::Function, {});
+        scope.push("getfloat", getfloat_fun, Scope::VarType::Function, {});
+        scope.push("getarray", getarray_fun, Scope::VarType::Function, {});
+        scope.push("getfarray", getfarray_fun, Scope::VarType::Function, {});
+        scope.push("putint", putint_fun, Scope::VarType::Function, {});
+        scope.push("putch", putch_fun, Scope::VarType::Function, {});
+        scope.push("putarray", putarray_fun, Scope::VarType::Function, {});
+        scope.push("putfloat", putfloat_fun, Scope::VarType::Function, {});
+        scope.push("putfarray", putfarray_fun, Scope::VarType::Function, {});
+        scope.push("starttime", starttime_fun, Scope::VarType::Function, {});
+        scope.push("stoptime", stoptime_fun, Scope::VarType::Function, {});
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
@@ -298,8 +299,7 @@ class CminusfBuilder : public syntax_tree_visitor {
 
     std::vector<int> to_indices(std::vector<Value *> &values);
 
-    void initializeArray(int u, int& curr, std::vector<Value *> &pos,
-                         std::vector<int> array_exps_int, bool const_array);
+    void initializeArray(AllocaInst *base, int total, bool const_array);
 
     ConstantInt *to_const_index(Value *value);
 
