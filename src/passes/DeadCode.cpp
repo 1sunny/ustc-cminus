@@ -70,7 +70,7 @@ bool DeadCode::sweep(Function *func) {
         }
     }
     for (auto inst : wait_del)
-        inst->remove_all_operands();
+        inst->remove_all_operands();//没用 inst->get_parent()->erase_instr里面会删除
     for (auto inst : wait_del)
         inst->get_parent()->erase_instr(inst);
     ins_count += wait_del.size();
@@ -86,9 +86,9 @@ bool DeadCode::is_critical(Instruction *ins) {
             return false;
         return true;
     }
-    if (ins->is_br() || ins->is_ret())
+    if (ins->is_br() || ins->is_ret() || ins->is_cmpbr() || ins->is_fcmpbr())
         return true;
-    if (ins->is_store())
+    if (ins->is_store() || ins->is_storeoffset()/* || ins->is_memset()*/)
         return true;
     return false;
 }

@@ -184,6 +184,10 @@ void Mem2Reg::rename(BasicBlock *bb) {
             } // else 由IRPrint处理
         }
     }
+    // 在 rename 过程中，需要保证在每个基本块中定义的变量在它支配的所有后继块中都能正确地被使用。
+    // 因此，遍历支配树的后继块可以确保：
+    // 当前块中的变量定义能在支配的后续块中传播。
+    // 如果在某个后继块中再次定义了同名变量，它的作用域只在这个后继块及其支配的区域内有效。
     for (BasicBlock * dom_tree_succ : dominators_->get_dom_tree_succ_blocks(bb)) {
         rename(dom_tree_succ);
     }
