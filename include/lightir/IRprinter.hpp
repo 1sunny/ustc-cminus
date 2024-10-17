@@ -12,3 +12,5 @@
 
 std::string print_as_op(Value *v, bool print_ty);
 std::string print_instr_op_name(Instruction::OpID);
+std::string print_cmp_type(CmpOp op);
+std::string print_fcmp_type(CmpOp op);

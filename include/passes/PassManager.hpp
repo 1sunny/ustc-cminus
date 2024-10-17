@@ -23,6 +23,7 @@ class PassManager {
     void add_pass(Args &&...args) {
         passes_.emplace_back(new PassType(m_, std::forward<Args>(args)...));
     }
+    void clear_pass() { passes_.clear(); }
 
     void run() {
         for (auto &pass : passes_) {

@@ -8,7 +8,13 @@ Function::Function(FunctionType *ty, const std::string &name, Module *parent)
     parent->add_function(this);
     // build args
     for (unsigned i = 0; i < get_num_of_args(); i++) {
-        arguments_.emplace_back(new Argument(ty->get_param_type(i), "", this, i));
+        Argument *arg = new Argument(ty->get_param_type(i), "", this, i);
+        arguments_.emplace_back(arg);
+        if(arg->get_type()->is_float_type()) {
+            f_args_.push_back(arg);
+        } else {
+            i_args_.push_back(arg);
+        }
     }
 }
 Function *Function::create(FunctionType *ty, const std::string &name,

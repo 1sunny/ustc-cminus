@@ -44,3 +44,11 @@ void User::remove_operand(unsigned idx) {
     operands_[idx]->remove_use(this, idx);
     operands_.erase(operands_.begin() + idx);
 }
+
+void User::remove_operands(int index1, int index2) {
+    for (int i = index1; i <= index2; i++) {
+        operands_[i]->remove_use(this, i);
+    }
+    operands_.erase(operands_.begin() + index1, operands_.begin() + index2 + 1);
+    num_ops_ = operands_.size();
+}

@@ -11,6 +11,52 @@ Module::Module() {
     int1_ty_ = std::make_unique<IntegerType>(1, this);
     int32_ty_ = std::make_unique<IntegerType>(32, this);
     float32_ty_ = std::make_unique<FloatType>(this);
+
+    instr_id2string_.insert({Instruction::ret, "ret"});
+    instr_id2string_.insert({Instruction::br, "br"});
+
+    instr_id2string_.insert({Instruction::add, "add"});
+    instr_id2string_.insert({Instruction::sub, "sub"});
+    instr_id2string_.insert({Instruction::mul, "mul"});
+    instr_id2string_.insert({Instruction::mul64, "mul64"});
+    instr_id2string_.insert({Instruction::sdiv, "sdiv"});
+    instr_id2string_.insert({Instruction::srem, "srem" });
+
+    instr_id2string_.insert({Instruction::fadd, "fadd"});
+    instr_id2string_.insert({Instruction::fsub, "fsub"});
+    instr_id2string_.insert({Instruction::fmul, "fmul"});
+    instr_id2string_.insert({Instruction::fdiv, "fdiv"});
+
+    instr_id2string_.insert({Instruction::alloca, "alloca"});
+    instr_id2string_.insert({Instruction::load, "load"});
+    instr_id2string_.insert({Instruction::store, "store"});
+    // instr_id2string_.insert({Instruction::memset, "memset"});
+
+    instr_id2string_.insert({Instruction::cmp, "icmp"});
+    instr_id2string_.insert({Instruction::fcmp, "fcmp"});
+    instr_id2string_.insert({Instruction::phi, "phi"});
+    instr_id2string_.insert({Instruction::call, "call"});
+    instr_id2string_.insert({Instruction::getelementptr, "getelementptr"});
+
+    // instr_id2string_.insert({Instruction::land, "and"});
+    // instr_id2string_.insert({Instruction::lor, "or"});
+    // instr_id2string_.insert({Instruction::lxor, "xor"});
+    //
+    // instr_id2string_.insert({Instruction::asr, "ashr"});
+    // instr_id2string_.insert({Instruction::shl, "shl"});
+    // instr_id2string_.insert({Instruction::lsr, "lshr"});
+    // instr_id2string_.insert({Instruction::asr64, "asr64"});
+    // instr_id2string_.insert({Instruction::shl64, "shl64"});
+    // instr_id2string_.insert({Instruction::lsr64, "lsr64"});
+
+    instr_id2string_.insert({Instruction::zext, "zext"});
+    instr_id2string_.insert({Instruction::sitofp, "sitofp"});
+    instr_id2string_.insert({Instruction::fptosi, "fptosi"});
+
+    instr_id2string_.insert({Instruction::cmpbr, "cmpbr"});
+    instr_id2string_.insert({Instruction::fcmpbr, "fcmpbr"});
+    instr_id2string_.insert({Instruction::loadoffset, "loadoffset"});
+    instr_id2string_.insert({Instruction::storeoffset, "storeoffset"});
 }
 
 Type *Module::get_void_type() { return void_ty_.get(); }

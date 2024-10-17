@@ -20,7 +20,7 @@ class Value {
     // 获取该值的类型
     Type *get_type() const { return type_; }
     // 取得该值的被使用情况
-    const std::list<Use> &get_use_list() const { return use_list_; }
+    std::list<Use> &get_use_list() { return use_list_; }
 
     bool set_name(std::string name);
 

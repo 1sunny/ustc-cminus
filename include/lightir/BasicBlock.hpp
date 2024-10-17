@@ -32,6 +32,24 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     void remove_pre_basic_block(BasicBlock *bb) { pre_bbs_.remove(bb); }
     void remove_succ_basic_block(BasicBlock *bb) { succ_bbs_.remove(bb); }
 
+    void incoming_reset() { incoming_branch = 0; }
+    bool is_incoming_zero() { return incoming_branch == 0; }
+    void incoming_add(int num) { incoming_branch += num; }
+    void incoming_decrement(){incoming_branch--;}
+
+    void set_loop_depth(int depth) { loop_depth = depth; }
+    int get_loop_depth() { return loop_depth; }
+    void loop_depth_add(int num) { loop_depth += num; }
+
+    void set_live_in_int(std::set<Value*> in){ilive_in = in;}
+    void set_live_out_int(std::set<Value*> out){ilive_out = out;}
+    void set_live_in_float(std::set<Value*> in){flive_in = in;}
+    void set_live_out_float(std::set<Value*> out){flive_out = out;}
+    std::set<Value*>& get_live_in_int(){return ilive_in;}
+    std::set<Value*>& get_live_out_int(){return ilive_out;}
+    std::set<Value*>& get_live_in_float(){return flive_in;}
+    std::set<Value*>& get_live_out_float(){return flive_out;}
+
     // If the Block is terminated by ret/br
     bool is_terminated() const;
     // Get terminator, only accept valid case use
@@ -41,6 +59,7 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     /****************api about Instruction****************/
     // 将指令 instr 添加到该基本块的指令链表末端，使用 IRBuilder 来创建函数时会自动调用此方法
     void add_instruction(Instruction *instr);
+    void add_instruction(std::list<Instruction *>::iterator instr_pos, Instruction *instr);
     // 将指令 instr 添加到该基本块的指令链表首部
     void add_instr_begin(Instruction *instr) { instr_list_.push_front(instr); }
     // 将指令 instr 从该基本块的指令链表中移除，该 API 会同时维护好 instr 的操作数的 use 链表。
@@ -70,4 +89,10 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     std::list<Instruction *> instr_list_;
     // llvm::ilist<Instruction> instr_list_;
     Function *parent_;
+    std::set<Value*> ilive_in;
+    std::set<Value*> ilive_out;
+    std::set<Value*> flive_in;
+    std::set<Value*> flive_out;
+    int incoming_branch = 0;
+    int loop_depth = 0;
 };

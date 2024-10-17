@@ -45,9 +45,13 @@ class Module {
     std::list<GlobalVariable*> &get_global_variable();
 
     void set_print_name();
+    void set_file_name(std::string name) { source_file_name_ = name; }
+    std::string get_file_name() { return source_file_name_; }
     std::string print();
 
+    std::string get_instr_op_name(Instruction::OpID instr) { return instr_id2string_[instr]; }
   private:
+    std::map<Instruction::OpID, std::string> instr_id2string_;  //& Instruction from opid to string
     // The global variables in the module
     std::list<GlobalVariable*> global_list_;
     // The functions in the module
@@ -63,4 +67,5 @@ class Module {
     std::map<std::pair<Type *, std::vector<Type *>>,
              std::unique_ptr<FunctionType>>
         function_map_;
+    std::string source_file_name_;
 };

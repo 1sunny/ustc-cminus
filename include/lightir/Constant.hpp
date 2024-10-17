@@ -18,7 +18,7 @@ class ConstantInt : public Constant {
     ConstantInt(Type *ty, int val) : Constant(ty, ""), value_(val) {}
 
   public:
-    int get_value() { return value_; }
+    int& get_value() { return value_; }
     // 以值 val 来创建常量
     static ConstantInt *get(int val, Module *m);
     static ConstantInt *get(bool val, Module *m);
@@ -60,6 +60,6 @@ class ConstantFP : public Constant {
 
   public:
     static ConstantFP *get(float val, Module *m);
-    float get_value() { return val_; }
+    float& get_value() { return val_; }
     virtual std::string print() override;
 };

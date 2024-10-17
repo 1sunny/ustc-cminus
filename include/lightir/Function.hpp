@@ -43,6 +43,9 @@ class Function : public Value/*, public llvm::ilist_node<Function> */{
     std::list<BasicBlock*> &get_basic_blocks() { return basic_blocks_; }
     std::list<Argument*> &get_args() { return arguments_; }
 
+    std::vector<Argument*> &get_iargs() { return i_args_; }
+    std::vector<Argument*> &get_fargs() { return f_args_; }
+
     bool is_declaration() { return basic_blocks_.empty(); }
 
     void set_instr_name();
@@ -51,6 +54,8 @@ class Function : public Value/*, public llvm::ilist_node<Function> */{
   private:
     std::list<BasicBlock*> basic_blocks_;
     std::list<Argument*> arguments_;
+    std::vector<Argument*> i_args_;
+    std::vector<Argument*> f_args_;
     Module *parent_;
     unsigned seq_cnt_; // print use
 };

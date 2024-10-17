@@ -23,6 +23,7 @@ class User : public Value {
 
     void remove_all_operands();
     void remove_operand(unsigned i);
+    void remove_operands(int index1, int index2);
 
   private:
     std::vector<Value *> operands_; // operands of this value

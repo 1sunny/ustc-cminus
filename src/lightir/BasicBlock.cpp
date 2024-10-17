@@ -21,6 +21,8 @@ bool BasicBlock::is_terminated() const {
     switch (instr_list_.back()->get_instr_type()) {
     case Instruction::ret:
     case Instruction::br:
+    case Instruction::cmpbr:
+    case Instruction::fcmpbr:
         return true;
     default:
         return false;
@@ -34,8 +36,12 @@ Instruction *BasicBlock::get_terminator() {
 }
 
 void BasicBlock::add_instruction(Instruction *instr) {
-    assert(not is_terminated() && "Inserting instruction to terminated bb");
+    // assert(not is_terminated() && "Inserting instruction to terminated bb");
     instr_list_.push_back(instr);
+}
+
+void BasicBlock::add_instruction(std::list<Instruction*>::iterator instr_pos, Instruction *instr) {
+    instr_list_.insert(instr_pos, instr);
 }
 
 std::string BasicBlock::print() {

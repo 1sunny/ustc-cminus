@@ -38,6 +38,18 @@ class Type {
     bool is_int32_type() const;
     bool is_int1_type() const;
 
+    static bool is_eq_type(Type *ty1, Type *ty2) { return ty1 == ty2; };
+
+    static Type *get_void_type(Module *m);
+    static Type *get_label_type(Module *m);
+    static IntegerType *get_int1_type(Module *m);
+    static IntegerType *get_int32_type(Module *m);
+    static PointerType *get_int32_ptr_type(Module *m);
+    static FloatType *get_float_type(Module *m);
+    static PointerType *get_float_ptr_type(Module *m);
+    static PointerType *get_pointer_type(Type *contained);
+    static ArrayType *get_array_type(Type *contained, unsigned num_elements);
+
     // Return related data member if is the required type, else throw error
     // 若是 PointerType 则返回指向的类型，若不是则返回 nullptr
     Type *get_pointer_element_type() const;

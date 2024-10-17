@@ -19,6 +19,42 @@ bool Type::is_int32_type() const {
            static_cast<const IntegerType *>(this)->get_num_bits() == 32;
 }
 
+Type *Type::get_void_type(Module *m) {
+    return m->get_void_type();
+}
+
+Type *Type::get_label_type(Module *m) {
+    return m->get_label_type();
+}
+
+IntegerType *Type::get_int1_type(Module *m) {
+    return m->get_int1_type();
+}
+
+IntegerType *Type::get_int32_type(Module *m) {
+    return m->get_int32_type();
+}
+
+PointerType *Type::get_int32_ptr_type(Module *m) {
+    return m->get_int32_ptr_type();
+}
+
+FloatType *Type::get_float_type(Module *m) {
+    return m->get_float_type();
+}
+
+PointerType *Type::get_float_ptr_type(Module *m) {
+    return m->get_float_ptr_type();
+}
+
+PointerType *Type::get_pointer_type(Type *contained) {
+    return PointerType::get(contained);
+}
+
+ArrayType *Type::get_array_type(Type *contained, unsigned num_elements) {
+    return ArrayType::get(contained, num_elements);
+}
+
 Type *Type::get_pointer_element_type() const {
     if (this->is_pointer_type())
         return static_cast<const PointerType *>(this)->get_element_type();
@@ -52,6 +88,7 @@ unsigned Type::get_size() const {
     case FloatTyID:
         return 4;
     case VoidTyID:
+        return 0;
     case LabelTyID:
     case FunctionTyID:
         assert(false && "bad use on get_size()");
