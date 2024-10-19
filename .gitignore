@@ -5,6 +5,7 @@ jianmu-supplemental-master/
 Note.md
 lecture/
 **/**/*.ll
+!**/baseline/*.ll
 tests/**/*.s
 tests/**/*.hasm
 /cmu
