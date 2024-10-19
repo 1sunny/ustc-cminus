@@ -16,6 +16,12 @@ void Value::add_use(User *user, unsigned arg_no) {
     use_list_.emplace_back(user, arg_no);
 };
 
+void Value::remove_use(Value *val) {
+  assert(std::count_if(use_list_.begin(), use_list_.end(), [val](const Use &use) { return use.val_ == val; }) <= 1);
+  auto is_val = [val](const Use &use) { return use.val_ == val; };
+  use_list_.remove_if(is_val);
+}
+
 void Value::remove_use(User *user, unsigned arg_no) {
     auto target_use = Use(user, arg_no);
     use_list_.remove_if([&](const Use &use) { return use == target_use; });

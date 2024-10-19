@@ -26,6 +26,7 @@ class Value {
 
     // 添加该值的被使用情况
     void add_use(User *user, unsigned arg_no);
+    void remove_use(Value *val);
     // 删除该值的被使用情况
     void remove_use(User *user, unsigned arg_no);
 
