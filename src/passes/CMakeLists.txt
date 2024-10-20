@@ -4,6 +4,7 @@ add_library(
     Mem2Reg.cpp
     FuncInfo.cpp
     DeadCode.cpp
+    ActiveVar.cpp
     CFGAnalyse.cpp
     LoopInvariant.cpp
 )
