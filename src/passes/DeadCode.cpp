@@ -6,6 +6,7 @@
 void DeadCode::run() {
     bool changed{};
     func_info->run();
+    int cnt=0;
     do {
         changed = false;
         for (auto &F : m_->get_functions()) {
@@ -13,14 +14,19 @@ void DeadCode::run() {
             mark(func);
             changed |= sweep(func);
         }
+        cnt++;
     } while (changed);
+    if (cnt > 2) {
+      LOG_ERROR << "dead code pass execute twice !!!";
+      exit(123);
+    }
     LOG_INFO << "dead code pass erased " << ins_count << " instructions";
 }
 
 void DeadCode::mark(Function *func) {
     work_list.clear();
     marked.clear();
-
+    // 将关键指令(影响范围可能在函数外的指令)比较并加入work_list
     for (auto &bb : func->get_basic_blocks()) {
         for (auto &ins : bb->get_instructions()) {
             if (is_critical(ins)) {
@@ -71,8 +77,11 @@ bool DeadCode::sweep(Function *func) {
     }
     for (auto inst : wait_del)
         inst->remove_all_operands();//没用 inst->get_parent()->erase_instr里面会删除
-    for (auto inst : wait_del)
+    for (auto inst : wait_del) {
         inst->get_parent()->erase_instr(inst);
+        // std::cout << "sweep: " << inst->print() << std::endl;
+    }
+
     ins_count += wait_del.size();
     return not wait_del.empty(); // changed
 }
