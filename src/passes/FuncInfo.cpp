@@ -28,7 +28,7 @@ void FuncInfo::trivial_mark(Function *func) {
         is_pure[func] = false;
         return;
     }
-    // 只要传入数组，都作为非纯函数处理
+    // 感觉这里太粗略了,只要有传入指针,都当成非纯函数,没使用过这个指针不就行了
     for (auto it = func->get_function_type()->param_begin();
          it != func->get_function_type()->param_end(); ++it) {
         auto arg_type = *it;
