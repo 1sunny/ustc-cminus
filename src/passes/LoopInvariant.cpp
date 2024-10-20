@@ -77,6 +77,7 @@ void LoopInvariant::find_invariants(std::vector<BasicBlock *> *loop) {
         if (defined_in_loop.find(instr) == defined_in_loop.end())
           continue;
         // 判断操作数是否在loop中被定义,如果定义过就不是循环不变量
+        // 因为已经常量传播过了,所以可以直接用这个判断是不是循环不变量,即不考虑某条指令的执行结果为固定值这类循环不变量
         for (auto operand: instr->get_operands()) {
           if (defined_in_loop.find(operand) != defined_in_loop.end()) {
             is_invariant = false;
