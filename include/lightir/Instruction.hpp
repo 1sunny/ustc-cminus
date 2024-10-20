@@ -115,20 +115,34 @@ class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
     bool is_call() const { return op_id_ == call; }
     bool is_gep() const { return op_id_ == getelementptr; }
     bool is_zext() const { return op_id_ == zext; }
+    bool is_fptosi(){ return op_id_ ==  fptosi; }
+    bool is_sitofp(){ return op_id_ ==  sitofp; }
 
-    // bool is_and() const { return op_id_ == And; }
-    // bool is_or() const { return op_id_ == Or; }
-    // bool is_not() const { return op_id_ == Not; }
+    bool is_and() const { return op_id_ == And; }
+    bool is_or() const { return op_id_ == Or; }
+    bool is_not() const { return op_id_ == Not; }
 
     bool is_cmpbr() const { return op_id_ == cmpbr; }
     bool is_fcmpbr() const { return op_id_ == fcmpbr; }
 
     bool is_storeoffset() const { return op_id_ == storeoffset; }
+    bool is_loadoffset() { return op_id_ == loadoffset; }
 
-    bool isBinary() const {
-        return (is_add() || is_sub() || is_mul() || is_div() || is_fadd() ||
-                is_fsub() || is_fmul() || is_fdiv() ||/* is_and() || is_or() ||*/ is_srem())  &&
-               (get_num_operand() == 2);
+    bool is_int_binary() {
+      return (is_add() || is_sub() || is_mul() || is_div() || is_srem())
+               // || is_mul64() ||
+               // is_and() || is_or() || is_xor() ||
+               // is_asr() || is_lsl() || is_lsr() || is_asr64() || is_lsl64() || is_lsr64())
+              &&
+             (get_num_operand() == 2);
+    }
+
+    bool is_float_binary() {
+      return (is_fadd() || is_fsub() || is_fmul() || is_fdiv()) && (get_num_operand() == 2);
+    }
+
+    bool is_binary() {
+      return is_int_binary() || is_float_binary();
     }
 
     bool isTerminator() const { return is_br() || is_ret() || is_cmpbr() || is_fcmpbr();; }

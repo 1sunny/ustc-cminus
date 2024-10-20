@@ -45,6 +45,7 @@ void User::remove_operand(unsigned idx) {
     operands_.erase(operands_.begin() + idx);
 }
 
+// TODO 维护其它operands_的arg_no
 void User::remove_operands(int index1, int index2) {
     for (int i = index1; i <= index2; i++) {
         operands_[i]->remove_use(this, i);

@@ -50,6 +50,7 @@ void Dominators::get_reverse_postorder(Function *f) {
     reverse_postorder_.reserve(f->get_num_basic_blocks());
     search(entry_block);
     std::reverse(reverse_postorder_.begin(), reverse_postorder_.end());
+    func_reverse_post_order_[f] = reverse_postorder_;
     LOG_DEBUG << f->get_name() << " reverse postorder:";
     for (const auto &item: reverse_postorder_) {
       std::cout << item->get_name() << ", ";

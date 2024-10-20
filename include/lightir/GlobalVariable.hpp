@@ -19,5 +19,6 @@ class GlobalVariable : public User/*, public llvm::ilist_node<GlobalVariable>*/ 
     virtual ~GlobalVariable() = default;
     Constant *get_init() { return init_val_; }
     bool is_const() { return is_const_; }
+    bool is_zero_initializer() { return dynamic_cast<ConstantZero*>(init_val_) != nullptr; }
     std::string print();
 };

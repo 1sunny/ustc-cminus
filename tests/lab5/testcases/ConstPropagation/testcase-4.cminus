@@ -2,7 +2,7 @@ int a;
 void main(void){
     int i;
 
-    a=(1<2)+2;
+    a=3;
     i=0;
     while(i<100000000)
     {

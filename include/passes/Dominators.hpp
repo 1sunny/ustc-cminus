@@ -22,6 +22,10 @@ class Dominators : public Pass {
         return dom_tree_succ_blocks_.at(bb);
     }
 
+    const std::vector<BasicBlock *>& get_reverse_post_order(Function *func) {
+      return func_reverse_post_order_[func];
+    }
+
   private:
     void create_idom(Function *f);
     void create_dominance_frontier(Function *f);
@@ -32,6 +36,7 @@ class Dominators : public Pass {
     std::map<BasicBlock *, BasicBlock *> idom_{};  // 直接支配
     std::map<BasicBlock *, BBSet> dom_frontier_{}; // 支配边界集合
     std::map<BasicBlock *, BBSet> dom_tree_succ_blocks_{}; // 支配树中的后继节点
+    std::map<Function*, std::vector<BasicBlock *>> func_reverse_post_order_;
 
     void get_reverse_postorder(Function *f);
     void search(BasicBlock *block);
