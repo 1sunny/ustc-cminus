@@ -55,9 +55,17 @@ class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
         // float binary operators
 
         // Logical operators
-        And,
-        Or,
+        land,
+        lor,
+        lxor,
         Not,
+        // Shift operators
+        asr,
+        shl,
+        lsr,
+        asr64,
+        shl64,
+        lsr64,
         //& LIR operators
         cmpbr,
         fcmpbr,
@@ -99,6 +107,7 @@ class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
     bool is_add() const { return op_id_ == add; }
     bool is_sub() const { return op_id_ == sub; }
     bool is_mul() const { return op_id_ == mul; }
+    bool is_mul64() { return op_id_ == mul64; }
     bool is_div() const { return op_id_ == sdiv; }
     bool is_srem() const { return op_id_ == srem; }
 
@@ -118,9 +127,17 @@ class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
     bool is_fptosi(){ return op_id_ ==  fptosi; }
     bool is_sitofp(){ return op_id_ ==  sitofp; }
 
-    bool is_and() const { return op_id_ == And; }
-    bool is_or() const { return op_id_ == Or; }
+    bool is_and() const { return op_id_ == land; }
+    bool is_or() const { return op_id_ == lor; }
+    bool is_xor() const { return op_id_ == lxor; }
     bool is_not() const { return op_id_ == Not; }
+
+    bool is_asr() { return op_id_ ==  asr; }
+    bool is_lsl() { return op_id_ ==  shl; }
+    bool is_lsr() { return op_id_ ==  lsr; }
+    bool is_asr64() { return op_id_ ==  asr64; }
+    bool is_lsl64() { return op_id_ ==  shl64; }
+    bool is_lsr64() { return op_id_ ==  lsr64; }
 
     bool is_cmpbr() const { return op_id_ == cmpbr; }
     bool is_fcmpbr() const { return op_id_ == fcmpbr; }
@@ -129,10 +146,10 @@ class Instruction : public User/*, public llvm::ilist_node<Instruction>*/ {
     bool is_loadoffset() { return op_id_ == loadoffset; }
 
     bool is_int_binary() {
-      return (is_add() || is_sub() || is_mul() || is_div() || is_srem())
-               // || is_mul64() ||
-               // is_and() || is_or() || is_xor() ||
-               // is_asr() || is_lsl() || is_lsr() || is_asr64() || is_lsl64() || is_lsr64())
+      return (is_add() || is_sub() || is_mul() || is_div() || is_srem()
+               || is_mul64() ||
+               is_and() || is_or() || is_xor() ||
+               is_asr() || is_lsl() || is_lsr() || is_asr64() || is_lsl64() || is_lsr64())
               &&
              (get_num_operand() == 2);
     }

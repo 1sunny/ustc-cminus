@@ -22,12 +22,14 @@ def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ConstPropagation", '-C', action='store_true')
     parser.add_argument("--LoopInvHoist",'-L', action='store_true')
+    parser.add_argument("--StrengthReduction",'-SR', action='store_true')
     parser.add_argument("--ActiveVars",'-A', action='store_true')
     args = parser.parse_args()
     return args
 
 def get_raw_testcases(root_path):
     file_names = glob.glob(root_path+'/*.cminus')
+    file_names += glob.glob(root_path+'/*.sy')
     pattern=r'[0-9]+'
     file_names.sort(key= lambda item:int(re.findall(pattern, os.path.basename(item))[0]))
     return file_names
@@ -74,7 +76,7 @@ def compile_testcases(file_lists,option):
             if result.returncode == 0:
                 exec_file,_=os.path.splitext(each)
 
-                each = each.replace('.cminus', '.ll')
+                each = each.replace('.cminus', '.ll').replace('.sy', '.ll')
                 CLANG_COMMAND = "clang -O0 -w " + each + " -o " + exec_file + " -L../../cmake-build-debug/ -lcminus_io"
                 try:
                     result = subprocess.run(CLANG_COMMAND, stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True,timeout=1)
@@ -83,8 +85,9 @@ def compile_testcases(file_lists,option):
                     else:
                         exec_files.append(None)
                         print(f"\nclang Compile {each.split('/')[-1]} \033[31;1m failed\033[0m")
-                except Exception as _:
+                except Exception as e:
                     exec_files.append(None)
+                    print(e)
                     print(f"clang Compile {each.split('/')[-1]} \033[31;1m failed\033[0m")
 
             else:
@@ -126,18 +129,27 @@ def evaluate(file_lists, metric_func, check_mode=True):
     return result
 
 def check_if_correct(exec_file, check_mode=True):
+    print('\nexec_file: ', exec_file)
     # return True
     if check_mode:
         try:
-            result = subprocess.run(exec_file, stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
+            input_file = None
+            if os.path.exists(exec_file + '.in'):
+                input_file = open(exec_file + '.in', 'r')
+            result = subprocess.run(exec_file, shell=True, stdin=input_file, stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=100)
             with open(exec_file+'.out', "rb") as fout:
-                answer = fout.read()
-                if result.stdout == answer:
+                answer = fout.read().decode()
+                output = result.stdout.decode()
+                if len(output) > 0 and output[-1] != '\n':
+                    output += '\n'
+                output += f"{result.returncode}\n"
+                if output == answer:
                     return True
                 else:
-                    print(f"Execute {exec_file.split('/')[-1]} result is not correct! your output:{result.stdout}, but the answer is:{answer}")
+                    print(f"Execute {exec_file.split('/')[-1]} result is not correct! your output:{output}, but the answer is:{answer}")
                     return False
-        except Exception as _:
+        except Exception as e:
+            print(e)
             print(f"Execute {exec_file.split('/')[-1]} \033[31;1m failed\033[0m")
             return False
     else:
@@ -147,15 +159,19 @@ def check_if_correct(exec_file, check_mode=True):
 def get_execute_time(exec_file):
     try:
         cmdline = "taskset -c 0 "+exec_file+" 2>&1"
+        input_file = None
+        if os.path.exists(exec_file + '.in'):
+            input_file = open(exec_file + '.in', 'r')
         start = time.time()
-        result = subprocess.run(cmdline, shell=True, stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
+        result = subprocess.run(cmdline, shell=True, stdin=input_file, stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=100)
         elapsed = time.time() - start
         return elapsed
     except Exception as e:
+        print(e)
         print(f"Execute {exec_file.split('/')[-1]} \033[31;1m failed\033[0m")
         return None
 
-def table_print(testcase, before_optimization, after_optimization, baseline):
+def table_print(testcase, before_optimization, after_optimization, baseline=[]):
     if len(before_optimization)==len(baseline) and \
         len(before_optimization) == len(after_optimization):
         pass
@@ -252,6 +268,21 @@ if __name__ == "__main__":
         exec_files3 = compile_baseline_files(baseline_files)
         results3 = evaluate(file_lists=exec_files3,metric_func=get_execute_time,check_mode=False)
         table_print(testcase=testcases,before_optimization=results1,after_optimization=results2,baseline=results3)
+
+    if usr_args.StrengthReduction:
+        print("="*10,"StrengthReduction","="*10)
+        root_path = os.path.join(os.path.dirname(script_path),'../section1/performance_test')
+        testcases = get_raw_testcases(root_path=root_path)
+        exec_files1 = compile_testcases(file_lists=testcases,option='')
+        results1 = evaluate(file_lists=exec_files1,metric_func=get_execute_time)
+
+        exec_files2 = compile_testcases(file_lists=testcases,option='-strength-reduction')
+        results2 = evaluate(file_lists=exec_files2,metric_func=get_execute_time)
+
+        # baseline_files = get_baseline_files(os.path.join(root_path,'baseline'))
+        # exec_files3 = compile_baseline_files(baseline_files)
+        # results3 = evaluate(file_lists=exec_files3,metric_func=get_execute_time,check_mode=False)
+        table_print(testcase=testcases,before_optimization=results1,after_optimization=results2)
 
     if usr_args.ActiveVars:
         print("="*10,"ActiveVars","="*10)

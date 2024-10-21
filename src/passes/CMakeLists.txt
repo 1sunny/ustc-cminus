@@ -7,4 +7,6 @@ add_library(
     ActiveVar.cpp
     CFGAnalyse.cpp
     LoopInvariant.cpp
+    ConstantPropagation.cpp
+    StrengthReduction.cpp
 )
