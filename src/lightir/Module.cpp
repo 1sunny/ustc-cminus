@@ -38,16 +38,16 @@ Module::Module() {
     instr_id2string_.insert({Instruction::call, "call"});
     instr_id2string_.insert({Instruction::getelementptr, "getelementptr"});
 
-    // instr_id2string_.insert({Instruction::land, "and"});
-    // instr_id2string_.insert({Instruction::lor, "or"});
-    // instr_id2string_.insert({Instruction::lxor, "xor"});
-    //
-    // instr_id2string_.insert({Instruction::asr, "ashr"});
-    // instr_id2string_.insert({Instruction::shl, "shl"});
-    // instr_id2string_.insert({Instruction::lsr, "lshr"});
-    // instr_id2string_.insert({Instruction::asr64, "asr64"});
-    // instr_id2string_.insert({Instruction::shl64, "shl64"});
-    // instr_id2string_.insert({Instruction::lsr64, "lsr64"});
+    instr_id2string_.insert({Instruction::land, "and"});
+    instr_id2string_.insert({Instruction::lor, "or"});
+    instr_id2string_.insert({Instruction::lxor, "xor"});
+
+    instr_id2string_.insert({Instruction::asr, "ashr"});
+    instr_id2string_.insert({Instruction::shl, "shl"});
+    instr_id2string_.insert({Instruction::lsr, "lshr"});
+    instr_id2string_.insert({Instruction::asr64, "asr64"});
+    instr_id2string_.insert({Instruction::shl64, "shl64"});
+    instr_id2string_.insert({Instruction::lsr64, "lsr64"});
 
     instr_id2string_.insert({Instruction::zext, "zext"});
     instr_id2string_.insert({Instruction::sitofp, "sitofp"});

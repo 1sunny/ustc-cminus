@@ -56,6 +56,14 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     // 返回该基本块的终止指令，若基本块的最后一条指令不是终止指令返回则返回 nullptr
     Instruction *get_terminator();
 
+    std::list<Instruction*>::iterator begin() { return instr_list_.begin(); }
+    std::list<Instruction*>::iterator end() { return instr_list_.end(); }
+    std::list<Instruction*>::iterator get_terminator_itr() {
+      auto itr = end();
+      itr--;
+      return itr;
+    }
+
     /****************api about Instruction****************/
     // 将指令 instr 添加到该基本块的指令链表末端，使用 IRBuilder 来创建函数时会自动调用此方法
     void add_instruction(Instruction *instr);

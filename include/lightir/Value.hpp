@@ -16,6 +16,11 @@ class Value {
         : type_(ty), name_(name){};
     virtual ~Value() { replace_all_use_with(nullptr); }
 
+    void take_name(Value* v) {
+      name_ = v->get_name();
+      v->name_= "";
+    }
+
     std::string get_name() const { return name_; };
     // 获取该值的类型
     Type *get_type() const { return type_; }
