@@ -62,24 +62,24 @@ ConstantInt *ConstantPropagation::resCalc(Instruction::OpID op, ConstantInt *val
     case Instruction::srem:
       res = const_value1 % const_value2;
       break;
-      // case Instruction::shl:
-      //   res = const_value1 << const_value2;
-      //   break;
-      // case Instruction::asr:
-      //   res = const_value1 >> const_value2;
-      //   break;
-      // case Instruction::lsr:
-      //   res = (int) ((unsigned) const_value1 >> const_value2);
-      //   break;
-      // case Instruction::land:
-      //   res = const_value1 & const_value2;
-      //   break;
-      // case Instruction::lor:
-      //   res = const_value1 | const_value2;
-      //   break;
-      // case Instruction::lxor:
-      //   res = const_value1 ^ const_value2;
-      //   break;
+      case Instruction::shl:
+        res = const_value1 << const_value2;
+        break;
+      case Instruction::asr:
+        res = const_value1 >> const_value2;
+        break;
+      case Instruction::lsr:
+        res = (int) ((unsigned) const_value1 >> const_value2);
+        break;
+      case Instruction::land:
+        res = const_value1 & const_value2;
+        break;
+      case Instruction::lor:
+        res = const_value1 | const_value2;
+        break;
+      case Instruction::lxor:
+        res = const_value1 ^ const_value2;
+        break;
     default:
       return nullptr;
       break;
