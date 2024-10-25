@@ -115,6 +115,7 @@ void Dominators::create_idom(Function *f) {
     // bug find by 10_if_else.sy: basic block with no pred should be deleted
     for (BasicBlock* b: reverse_postorder_) {
       MY_ASSERT(idom_[b] != nullptr);
+      b->set_idom(idom_[b]);
     }
 }
 

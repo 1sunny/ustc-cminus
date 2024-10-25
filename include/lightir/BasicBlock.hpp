@@ -50,6 +50,9 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     std::set<Value*>& get_live_in_float(){return flive_in;}
     std::set<Value*>& get_live_out_float(){return flive_out;}
 
+    void set_idom(BasicBlock* bb){idom_ = bb;}
+    BasicBlock* get_idom(){return idom_;}
+
     // If the Block is terminated by ret/br
     bool is_terminated() const;
     // Get terminator, only accept valid case use
@@ -103,4 +106,5 @@ class BasicBlock : public Value/*, public llvm::ilist_node<BasicBlock>*/ {
     std::set<Value*> flive_out;
     int incoming_branch = 0;
     int loop_depth = 0;
+    BasicBlock* idom_ = nullptr;
 };
