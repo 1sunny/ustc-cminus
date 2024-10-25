@@ -93,6 +93,7 @@ void LoopInvariant::find_invariants(std::vector<BasicBlock *> *loop) {
         //         continue;
         // }
         // 判断loop中的store有没有写入过要load的基础地址,如果写入过,则load不是invariant
+        // int a[2]; int *b = a; 因为不会有这样的操作,所以可以用数组名字(因为所有地方只会用a来访问数组)来看有没有向数组写入
         if (is_invariant && instr->is_load()) {
           auto ptr = ld2addr[instr];
           for (auto pair: st2addr) {
