@@ -22,6 +22,7 @@ class User : public Value {
     void add_operand(Value *v);
 
     void remove_all_operands();
+    void remove_use_of_ops();
     void remove_operand(unsigned i);
     void remove_operands(int index1, int index2);
 

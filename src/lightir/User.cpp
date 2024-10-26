@@ -33,6 +33,12 @@ void User::remove_all_operands() {
     operands_.clear();
 }
 
+void User::remove_use_of_ops() {
+  for (auto op : operands_) {
+    op->remove_use(this);
+  }
+}
+
 void User::remove_operand(unsigned idx) {
     assert(idx < operands_.size() && "remove_operand out of index");
     // influence on other operands
