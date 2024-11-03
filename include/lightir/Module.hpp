@@ -50,6 +50,8 @@ class Module {
     std::string print();
 
     std::string get_instr_op_name(Instruction::OpID instr) { return instr_id2string_[instr]; }
+    Function *get_main_function();
+
   private:
     std::map<Instruction::OpID, std::string> instr_id2string_;  //& Instruction from opid to string
     // The global variables in the module

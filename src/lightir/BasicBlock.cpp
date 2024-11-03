@@ -35,6 +35,10 @@ Instruction *BasicBlock::get_terminator() {
     return instr_list_.back();
 }
 
+Instruction *BasicBlock::try_get_terminator() {
+  return instr_list_.back();
+}
+
 void BasicBlock::add_instruction(Instruction *instr) {
     // assert(not is_terminated() && "Inserting instruction to terminated bb");
     instr_list_.push_back(instr);

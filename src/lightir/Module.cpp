@@ -59,6 +59,10 @@ Module::Module() {
     instr_id2string_.insert({Instruction::storeoffset, "storeoffset"});
 }
 
+Function* Module::get_main_function() {
+  return *(function_list_.rbegin());
+}
+
 Type *Module::get_void_type() { return void_ty_.get(); }
 Type *Module::get_label_type() { return label_ty_.get(); }
 IntegerType *Module::get_int1_type() { return int1_ty_.get(); }
