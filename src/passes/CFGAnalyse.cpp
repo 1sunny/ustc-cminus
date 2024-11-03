@@ -38,6 +38,9 @@ void CFGAnalyse::incoming_find(Function *func) {
   incoming_DFS(bb);
 }
 
+// 0 -> 基本块未访问过
+// 1 -> 基本块正在访问中(在当前的递归栈中)
+// 2 -> 基本块已访问完毕(即所有后继基本块也已递归处理完毕)
 //& get In-Degree during Depth-First Traversal -> BasicBlock::incoming_branch
 void CFGAnalyse::incoming_DFS(BasicBlock *bb) {
   for (auto succ_bb: bb->get_succ_basic_blocks()) {
@@ -121,6 +124,7 @@ void CFGAnalyse::tarjan_DFS(BasicBlock *BB) {
     }
     BB_Stack.pop();
     color[bb_top] = 2;
+    // 循环头在rbegin,循环结尾(跳回循环头)在begin
     BBs->push_back(bb_top);
     if (BBs->size() > 1) {
       loops.push_back(BBs);
