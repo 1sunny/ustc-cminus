@@ -36,7 +36,10 @@ Instruction *BasicBlock::get_terminator() {
 }
 
 Instruction *BasicBlock::try_get_terminator() {
-  return instr_list_.back();
+  if (is_terminated()) {
+    return instr_list_.back();
+  }
+  return nullptr;
 }
 
 void BasicBlock::add_instruction(Instruction *instr) {
